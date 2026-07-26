@@ -1,0 +1,89 @@
+@import "tailwindcss";
+
+/* ============================================================
+   Ootybites theme — official brand palette.
+   Nilgiri Green #2F9E57 · Deep Green #12402A · Amber Gold #D98324
+   Sun Yellow #F6D873 · Cream #FFF7ED. Fraunces serif + Inter.
+   ============================================================ */
+@theme {
+  /* Nilgiri-green brand scale (500 = #2F9E57, 800 = Deep Green #12402A). */
+  --color-brand-50: #eaf6ef;
+  --color-brand-100: #cfeadb;
+  --color-brand-200: #a3d8ba;
+  --color-brand-300: #6fc196;
+  --color-brand-400: #45ac74;
+  --color-brand-500: #2f9e57; /* Nilgiri Green — primary */
+  --color-brand-600: #268048; /* hover */
+  --color-brand-700: #1b6038;
+  --color-brand-800: #12402a; /* Deep Green */
+  --color-brand-900: #0d2f20;
+
+  /* Amber Gold accent (+ Sun Yellow at 300). */
+  --color-accent-300: #f6d873; /* Sun Yellow */
+  --color-accent-400: #e9a53c;
+  --color-accent-500: #d98324; /* Amber Gold */
+  --color-accent-600: #b86a1a;
+
+  /* Neutrals — cream canvas, deep-green ink. */
+  --color-ink: #14301f;
+  --color-muted: #5b6b60;
+  --color-line: #ece3d5;
+  --color-canvas: #fff7ed; /* Cream */
+  --color-cream: #fff7ed;
+
+  /* Type — Fraunces serif for display headings, Inter for body. */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
+
+  --radius-xl: 18px;
+
+  /* Soft, warm shadow used on cards and hero CTAs. */
+  --shadow-soft: 0 8px 30px -12px color-mix(in oklab, var(--color-brand-500) 25%, transparent);
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-canvas text-ink antialiased;
+  font-family: var(--font-sans);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+.font-serif {
+  font-family: var(--font-display);
+}
+
+.shadow-soft {
+  box-shadow: var(--shadow-soft);
+}
+
+/* Brand gradients — reused by hero and brand marks. */
+.bg-brand-gradient {
+  background-image: linear-gradient(150deg, var(--color-brand-500) 0%, var(--color-brand-700) 100%);
+}
+.bg-brand-radial {
+  background-image: radial-gradient(
+    circle at 78% 12%,
+    var(--color-brand-400) 0%,
+    var(--color-brand-500) 40%,
+    var(--color-brand-700) 100%
+  );
+}
+
+/* Subtle grid overlay used on the hero. */
+.hero-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-size: 30px 30px;
+  -webkit-mask-image: radial-gradient(circle at 70% 30%, #000 20%, transparent 72%);
+  mask-image: radial-gradient(circle at 70% 30%, #000 20%, transparent 72%);
+}
