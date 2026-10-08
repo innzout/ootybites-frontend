@@ -1,0 +1,14 @@
+Both font files in this directory are licensed under the
+SIL Open Font License, Version 1.1 — https://scripts.sil.org/OFL
+
+  PlusJakartaSans-Variable.woff2   Plus Jakarta Sans — Tokotype
+  BricolageGrotesque-Variable.woff2  Bricolage Grotesque — Mathieu Triay
+
+Each is the latin subset of the upstream variable font, as served by Google
+Fonts. Self-hosted so the production build has no network dependency and the
+customer's browser makes no third-party request for fonts.
+
+To refresh, take the `latin` @font-face src from:
+  https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@200..800
+  https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,200..800
+(request with a modern browser User-Agent, or Google returns ttf instead of woff2)

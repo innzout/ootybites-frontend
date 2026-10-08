@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, Plus_Jakarta_Sans } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { MapsConfigProvider } from "@/components/shop/MapsConfig";
@@ -8,15 +8,30 @@ import { DEFAULT_DESCRIPTION, SITE_KEYWORDS, SITE_NAME, SITE_URL } from "@/lib/s
 
 // Plus Jakarta Sans for all UI/body text — clean, friendly and highly legible.
 // Bricolage Grotesque for display headings + the brand wordmark (characterful).
-const jakarta = Plus_Jakarta_Sans({
-  subsets: ["latin"],
+//
+// Self-hosted rather than next/font/google. Both are multi-axis VARIABLE fonts
+// (Bricolage has opsz, wdth and wght), and asking next/font/google for a list of
+// discrete weights made its loader fail to parse Google's response — the Vercel
+// build died with "Cannot read properties of null (reading '1')". It built fine
+// locally, which is the tell: it is a build-time network dependency, not a code
+// error.
+//
+// Self-hosting removes that dependency entirely and is better in production
+// anyway: no fetch during the build, no request to Google at runtime (so no
+// third-party font call from the customer's browser), and one file per family
+// covering every weight. Files are the latin subset of the variable font; both
+// families are SIL Open Font License, see fonts/OFL.txt.
+const jakarta = localFont({
+  src: "./fonts/PlusJakartaSans-Variable.woff2",
   variable: "--font-jakarta",
-  weight: ["400", "500", "600", "700", "800"],
+  weight: "200 800", // variable range, not a single weight
+  display: "swap",
 });
-const bricolage = Bricolage_Grotesque({
-  subsets: ["latin"],
+const bricolage = localFont({
+  src: "./fonts/BricolageGrotesque-Variable.woff2",
   variable: "--font-bricolage",
-  weight: ["400", "500", "600", "700", "800"],
+  weight: "200 800",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
