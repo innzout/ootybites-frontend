@@ -2,7 +2,6 @@
 import { askConfirm } from "@/lib/confirm";
 
 import { use, useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Product, Variant } from "@/types";
 import {
@@ -12,7 +11,9 @@ import {
   adminUpdateVariant,
   adminDeleteVariant,
   adminAddImage,
+  adminListCategories,
 } from "@/lib/adminEndpoints";
+import type { Category } from "@/lib/endpoints";
 import { ApiException } from "@/lib/api";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -20,6 +21,7 @@ import { Card } from "@/components/ui/Card";
 import { Spinner } from "@/components/ui/Spinner";
 import { Badge } from "@/components/ui/Badge";
 import { ImageUpload } from "@/components/admin/ImageUpload";
+import { Breadcrumbs } from "@/components/admin/Breadcrumbs";
 
 const UNITS = ["mg", "g", "kg", "ml", "l", "nos", "packets"];
 
@@ -32,6 +34,8 @@ export default function ProductEditPage({ params }: { params: Promise<{ id: stri
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
   const [isActive, setIsActive] = useState(true);
+  const [categoryId, setCategoryId] = useState("");
+  const [categories, setCategories] = useState<Category[]>([]);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -44,18 +48,23 @@ export default function ProductEditPage({ params }: { params: Promise<{ id: stri
         setSlug(p.slug);
         setDescription(p.description ?? "");
         setIsActive(p.is_active);
+        setCategoryId(p.category_id ?? "");
       })
       .catch(() => setProduct(null))
       .finally(() => setLoading(false));
   }, [id]);
   useEffect(load, [load]);
 
+  useEffect(() => {
+    adminListCategories().then((d) => setCategories(d.categories ?? [])).catch(() => setCategories([]));
+  }, []);
+
   async function saveProduct() {
     setSaving(true);
     setError(null);
     setMsg(null);
     try {
-      await adminUpdateProduct(id, { name, slug, description, is_active: isActive });
+      await adminUpdateProduct(id, { name, slug, description, is_active: isActive, category_id: categoryId || null });
       setMsg("Product saved");
       load();
     } catch (ex) {
@@ -70,10 +79,8 @@ export default function ProductEditPage({ params }: { params: Promise<{ id: stri
 
   return (
     <div className="max-w-3xl">
-      <Link href="/admin/products" className="text-sm text-brand-600 hover:underline">
-        ← Products
-      </Link>
-      <h1 className="mt-2 font-display text-xl font-bold text-ink">Edit product</h1>
+      <Breadcrumbs items={[{ label: "Products", href: "/admin/products" }, { label: product?.name ?? "Edit" }]} />
+      <h1 className="mb-4 font-sans text-2xl font-bold tracking-tight text-ink">Edit product</h1>
 
       {/* Product details */}
       <Card className="mt-4 p-4">
@@ -83,6 +90,23 @@ export default function ProductEditPage({ params }: { params: Promise<{ id: stri
           <div className="sm:col-span-2">
             <Input label="Description" value={description} onChange={(e) => setDescription(e.target.value)} />
           </div>
+          {categories.length > 0 && (
+            <label className="flex flex-col gap-1">
+              <span className="text-sm font-medium text-ink">Category</span>
+              <select
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+                className="h-10 rounded-xl border border-line bg-white px-3 text-sm text-ink outline-none focus:border-brand-500"
+              >
+                <option value="">— No category —</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
         </div>
         <label className="mt-3 flex items-center gap-2 text-sm text-muted">
           <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />

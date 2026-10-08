@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useDealerAuthStore } from "@/store/dealerAuthStore";
+import { useHydrated } from "@/lib/useHydrated";
 import { Spinner } from "@/components/ui/Spinner";
 import { BrandMark } from "@/components/ui/BrandMark";
 
@@ -13,8 +14,8 @@ export default function DealerLayout({ children }: { children: React.ReactNode }
   const dealer = useDealerAuthStore((s) => s.dealer);
   const logout = useDealerAuthStore((s) => s.logout);
 
-  const [ready, setReady] = useState(false);
-  useEffect(() => setReady(true), []);
+  // Wait for real rehydration, not just mount — see lib/useHydrated.
+  const ready = useHydrated(useDealerAuthStore);
   useEffect(() => {
     if (ready && !isAuthed) router.replace("/dealer/login");
   }, [ready, isAuthed, router]);
@@ -31,15 +32,22 @@ export default function DealerLayout({ children }: { children: React.ReactNode }
     <div className="min-h-screen bg-canvas">
       <header className="sticky top-0 z-30 bg-brand-800">
         <div className="mx-auto flex h-16 max-w-4xl items-center justify-between px-4">
-          <Link href="/dealer/orders">
-            <BrandMark size="sm" />
+          <Link
+            href="/dealer/orders"
+            aria-label="Ootybites — dealer home"
+            className="rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+          >
+            {/* Header is bg-brand-800 (deep green), so the mark must be the
+                white knockout — the colour wordmark is dark green ink and was
+                all but invisible against it. */}
+            <BrandMark size="sm" tone="onDark" />
           </Link>
           <div className="flex items-center gap-3 text-sm text-cream/80">
             {dealer && <span className="hidden sm:inline">{dealer.name}</span>}
             <button
               onClick={() => {
                 logout();
-                router.replace("/dealer/login");
+                router.replace("/"); // back to the storefront home, not login
               }}
               className="rounded-full px-3 py-1.5 font-semibold hover:bg-white/10 hover:text-white"
             >

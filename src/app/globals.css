@@ -3,19 +3,19 @@
 /* ============================================================
    Ootybites theme — official brand palette.
    Nilgiri Green #2F9E57 · Deep Green #12402A · Amber Gold #D98324
-   Sun Yellow #F6D873 · Cream #FFF7ED. Fraunces serif + Inter.
+   Sun Yellow #F6D873 · white canvas. Bricolage Grotesque + Plus Jakarta Sans.
    ============================================================ */
 @theme {
-  /* Nilgiri-green brand scale (500 = #2F9E57, 800 = Deep Green #12402A). */
-  --color-brand-50: #eaf6ef;
-  --color-brand-100: #cfeadb;
-  --color-brand-200: #a3d8ba;
-  --color-brand-300: #6fc196;
-  --color-brand-400: #45ac74;
-  --color-brand-500: #2f9e57; /* Nilgiri Green — primary */
-  --color-brand-600: #268048; /* hover */
-  --color-brand-700: #1b6038;
-  --color-brand-800: #12402a; /* Deep Green */
+  /* Nilgiri-green brand scale — brightened for a livelier storefront. */
+  --color-brand-50: #e8fbf0;
+  --color-brand-100: #c7f4d9;
+  --color-brand-200: #92e8b6;
+  --color-brand-300: #57d78e;
+  --color-brand-400: #2fc270;
+  --color-brand-500: #22ab5f; /* brighter Nilgiri Green — primary */
+  --color-brand-600: #1c8f4f; /* hover */
+  --color-brand-700: #166b3d;
+  --color-brand-800: #12402a; /* Deep Green (logo/nav) */
   --color-brand-900: #0d2f20;
 
   /* Amber Gold accent (+ Sun Yellow at 300). */
@@ -24,18 +24,32 @@
   --color-accent-500: #d98324; /* Amber Gold */
   --color-accent-600: #b86a1a;
 
-  /* Neutrals — cream canvas, deep-green ink. */
+  /* Neutrals — white canvas, deep-green ink. */
   --color-ink: #14301f;
   --color-muted: #5b6b60;
-  --color-line: #ece3d5;
-  --color-canvas: #fff7ed; /* Cream */
-  --color-cream: #fff7ed;
+  --color-line: #e7e9ea; /* crisp neutral border on white */
+  --color-canvas: #ffffff; /* white page background */
+  --color-surface: #f6f7f8; /* subtle panel fill for inset zones */
+  --color-cream: #fff7ed; /* warm tint — text on dark green surfaces */
 
-  /* Type — Fraunces serif for display headings, Inter for body. */
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
+  /* Type — Plus Jakarta Sans for all UI/body (clean, friendly); Bricolage
+     Grotesque for display headings + the brand wordmark. */
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-bricolage), var(--font-jakarta), ui-sans-serif, sans-serif;
 
   --radius-xl: 18px;
+
+  /* Pinned so lib/deviceStatus.ts can read the same breakpoints the utilities
+     use — JS and CSS then cannot drift apart. */
+  --breakpoint-sm: 40rem;
+  --breakpoint-md: 48rem;
+
+  /* One motion vocabulary for the whole storefront. Every transition and
+     entrance uses these, so nothing on the site eases differently. */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-quick: 180ms;
+  --duration-base: 320ms;
+  --duration-slow: 620ms;
 
   /* Soft, warm shadow used on cards and hero CTAs. */
   --shadow-soft: 0 8px 30px -12px color-mix(in oklab, var(--color-brand-500) 25%, transparent);
@@ -78,6 +92,65 @@ h3 {
   );
 }
 
+/* Product quick-view: the image rotates (flips) into view; the panel pops in. */
+@keyframes rotate-in {
+  from {
+    transform: perspective(700px) rotateY(-90deg) scale(0.92);
+    opacity: 0;
+  }
+  to {
+    transform: perspective(700px) rotateY(0deg) scale(1);
+    opacity: 1;
+  }
+}
+.animate-rotate-in {
+  animation: rotate-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-style: preserve-3d;
+}
+@keyframes pop-in {
+  from {
+    transform: translateY(10px) scale(0.96);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+.animate-pop-in {
+  animation: pop-in 0.22s ease-out both;
+}
+
+/* Backdrop/overlay fade — used by modals and the confirm dialog. */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out both;
+}
+
+/* Respect users who ask for less motion (WCAG 2.3.3) — drop the transform/opacity
+   entrances so nothing slides, flips or fades for them. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-rotate-in,
+  .animate-pop-in,
+  .animate-fade-in {
+    animation: none;
+  }
+}
+
+/* "Shades" — a softer, deeper resting shadow for product surfaces. */
+.shadow-product {
+  box-shadow:
+    0 1px 2px rgba(20, 48, 31, 0.04),
+    0 10px 24px -12px rgba(20, 48, 31, 0.18);
+}
+
 /* Subtle grid overlay used on the hero. */
 .hero-grid {
   background-image:
@@ -86,4 +159,71 @@ h3 {
   background-size: 30px 30px;
   -webkit-mask-image: radial-gradient(circle at 70% 30%, #000 20%, transparent 72%);
   mask-image: radial-gradient(circle at 70% 30%, #000 20%, transparent 72%);
+}
+
+/* Hero backdrop. Dawn over the ranges, in brand colours: warm low sky lifting
+   into cream, grounded in Deep Green. The shader draws the ridges on top of
+   this; with no WebGL2 this gradient *is* the hero and nothing looks broken. */
+.hero-hills {
+  background-image:
+    radial-gradient(120% 90% at 74% 18%, color-mix(in oklab, var(--color-accent-300) 72%, transparent) 0%, transparent 58%),
+    linear-gradient(
+      180deg,
+      var(--color-cream) 0%,
+      color-mix(in oklab, var(--color-accent-300) 40%, var(--color-cream)) 26%,
+      var(--color-brand-600) 68%,
+      var(--color-brand-800) 100%
+    );
+}
+
+/* Google's PlaceAutocompleteElement (Places API New) is a web component that
+   ships its own Material styling — on this app it rendered as a black bar.
+   It exposes Material design tokens as CSS custom properties, so theme it to
+   match our inputs rather than trying to reach into its shadow DOM. */
+.ob-place-autocomplete {
+  display: block;
+  width: 100%;
+  /* The app is light-only (:root sets color-scheme: light), but this component
+     follows the OS theme on its own, so on a dark-mode machine it rendered as a
+     black bar in an otherwise light form. Pin it to light. */
+  color-scheme: light;
+
+  /* Surface + text */
+  --gmp-mat-color-surface: #ffffff;
+  --gmp-mat-color-on-surface: var(--color-ink);
+  --gmp-mat-color-on-surface-variant: var(--color-muted);
+  --gmp-mat-color-outline: var(--color-line);
+  --gmp-mat-color-outline-decorative: var(--color-line);
+
+  /* Brand accents for hover/selection in the suggestion list */
+  --gmp-mat-color-primary: var(--color-brand-600);
+  --gmp-mat-color-on-primary: #ffffff;
+  --gmp-mat-color-surface-container-highest: var(--color-brand-50);
+  --gmp-mat-color-info: var(--color-brand-600);
+
+  --gmp-mat-font-family: var(--font-sans), system-ui, sans-serif;
+  --gmp-mat-font-size-body: 0.875rem;
+
+  /* Google ships this element with NO border and a white surface, so once it was
+     themed to our palette it became white-on-white — all the customer could see
+     was the magnifier glyph and there was no way to tell it was a search field.
+     Give it the same affordance as every other input in the form. */
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: #ffffff;
+  /* NO overflow:hidden here — the suggestions dropdown renders as a child of
+     this element, so clipping the box silently hid every result and made the
+     search look broken. */
+  transition: border-color 150ms var(--ease-out-soft), box-shadow 150ms var(--ease-out-soft);
+}
+
+.ob-place-autocomplete:hover {
+  border-color: var(--color-brand-400);
+}
+
+/* The element keeps focus inside its shadow root, so :focus-within is what
+   actually fires here — mirrors the focus ring on our own inputs. */
+.ob-place-autocomplete:focus-within {
+  border-color: var(--color-brand-500);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-brand-500) 25%, transparent);
 }

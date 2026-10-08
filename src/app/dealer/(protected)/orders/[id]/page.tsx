@@ -12,10 +12,12 @@ import { Card } from "@/components/ui/Card";
 import { Spinner } from "@/components/ui/Spinner";
 import { Button } from "@/components/ui/Button";
 import { OrderTimeline } from "@/components/order/OrderTimeline";
+import { OrderLocationMap } from "@/components/admin/OrderLocationMap";
+import { DeliveryHandoff } from "@/components/admin/DeliveryHandoff";
 
 // Dealers move orders forward; cancellation stays with admins.
 const nextForward: Record<OrderStatus, OrderStatus | null> = {
-  placed: "reached_dealer",
+  placed: "delivered",
   reached_dealer: "delivered",
   delivered: null,
   cancelled: null,
@@ -104,6 +106,13 @@ export default function DealerOrderDetailPage({ params }: { params: Promise<{ id
           {order.ship_line1}
           {order.ship_line2 ? `, ${order.ship_line2}` : ""}, {order.ship_city}, {order.ship_state} - {order.ship_pincode}
         </p>
+        {order.delivery_note && (
+          <p className="mt-2 rounded-lg bg-accent-300/20 px-2.5 py-1.5 text-ink">
+            <span className="font-semibold">Note:</span> {order.delivery_note}
+          </p>
+        )}
+        <OrderLocationMap lat={order.ship_lat} lng={order.ship_lng} label={order.ship_name} />
+        <DeliveryHandoff order={order} />
         <p className="mt-2 font-semibold text-ink">Collect on delivery: {formatPrice(order.total)}</p>
       </Card>
 

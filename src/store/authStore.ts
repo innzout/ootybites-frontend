@@ -17,6 +17,7 @@ interface AuthState {
   customer: CustomerProfile | null;
   isAuthenticated: () => boolean;
   login: (token: string, customer: CustomerProfile) => void;
+  setName: (name: string) => void;
   logout: () => void;
 }
 
@@ -27,6 +28,10 @@ export const useAuthStore = create<AuthState>()(
       customer: null,
       isAuthenticated: () => !!get().token,
       login: (token, customer) => set({ token, customer }),
+      setName: (name) => {
+        const c = get().customer;
+        if (c) set({ customer: { ...c, name } });
+      },
       logout: () => set({ token: null, customer: null }),
     }),
     { name: "ootybites-auth" },

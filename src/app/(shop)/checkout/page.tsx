@@ -9,16 +9,23 @@ import {
   placeOrder,
   listAddresses,
   createAddress,
+  expressCheck,
   type ShippingInput,
 } from "@/lib/endpoints";
 import type { Address } from "@/types";
 import { validateFields, required, phoneIN, pincode } from "@/lib/validators";
 import { ApiException } from "@/lib/api";
 import { toast } from "@/lib/toast";
+import { askConfirm } from "@/lib/confirm";
 import { formatPrice } from "@/lib/format";
-import { Input } from "@/components/ui/Input";
-import { Button } from "@/components/ui/Button";
-import { cn } from "@/lib/cn";
+import Link from "next/link";
+import { buttonClasses } from "@/components/ui/Button";
+import { Spinner } from "@/components/ui/Spinner";
+import { useHydrated } from "@/lib/useHydrated";
+import { AddressFields, DEFAULT_STATE } from "@/components/shop/AddressFields";
+import { AddressBook } from "@/components/checkout/AddressBook";
+import { OrderSummary } from "@/components/checkout/OrderSummary";
+import type { ExpressResult } from "@/components/checkout/DeliveryMethod";
 
 const emptyShipping: ShippingInput = {
   name: "",
@@ -26,7 +33,7 @@ const emptyShipping: ShippingInput = {
   line1: "",
   line2: "",
   city: "",
-  state: "",
+  state: DEFAULT_STATE,
   pincode: "",
 };
 
@@ -38,14 +45,21 @@ const toShipping = (a: Address): ShippingInput => ({
   city: a.city,
   state: a.state,
   pincode: a.pincode,
+  lat: a.lat,
+  lng: a.lng,
 });
 
+// Checkout orchestration. The address book, order summary and delivery-method
+// panels are their own components — this file owns only state and submission,
+// which is the part worth reading when the order flow changes.
 export default function CheckoutPage() {
   const router = useRouter();
   const items = useCartStore((s) => s.items);
   const clear = useCartStore((s) => s.clear);
   const subtotal = useCartStore((s) => s.subtotal());
   const isAuthed = useAuthStore((s) => s.isAuthenticated());
+  const cartHydrated = useHydrated(useCartStore);
+  const authHydrated = useHydrated(useAuthStore);
   const logout = useAuthStore((s) => s.logout);
 
   const [addresses, setAddresses] = useState<Address[]>([]);
@@ -54,12 +68,39 @@ export default function CheckoutPage() {
   const [saveNew, setSaveNew] = useState(true);
 
   const [ship, setShip] = useState<ShippingInput>(emptyShipping);
+  const [deliveryNote, setDeliveryNote] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [code, setCode] = useState("");
   const [discount, setDiscount] = useState(0);
   const [couponMsg, setCouponMsg] = useState<string | null>(null);
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [express, setExpress] = useState<ExpressResult | null>(null);
+  const [checkingExpress, setCheckingExpress] = useState(false);
+
+  // Check 24-hour (hub) availability whenever a full pincode is entered. This
+  // drives which fulfilment flow the order takes: express (local hub stock, 24h)
+  // vs standard (central stock, 3–5 days).
+  useEffect(() => {
+    const pin = ship.pincode.trim();
+    if (!/^[1-9]\d{5}$/.test(pin) || items.length === 0) {
+      setExpress(null);
+      setCheckingExpress(false);
+      return;
+    }
+    let live = true;
+    setCheckingExpress(true);
+    const t = setTimeout(() => {
+      expressCheck(pin, items)
+        .then((r) => live && setExpress(r))
+        .catch(() => live && setExpress(null))
+        .finally(() => live && setCheckingExpress(false));
+    }, 350);
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
+  }, [ship.pincode, items]);
 
   // Load saved addresses; preselect the default.
   useEffect(() => {
@@ -78,8 +119,13 @@ export default function CheckoutPage() {
       .catch(() => setAddresses([]));
   }, [isAuthed]);
 
-  const set = (k: keyof ShippingInput) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setShip((s) => ({ ...s, [k]: e.target.value }));
+  // A cart edit invalidates any applied discount — the amount was calculated
+  // against the old lines. Clearing it stops the summary showing a saving the
+  // server will not honour at placement.
+  useEffect(() => {
+    setDiscount(0);
+    setCouponMsg(null);
+  }, [items]);
 
   function pickSaved(a: Address) {
     setSelectedId(a.id);
@@ -92,20 +138,6 @@ export default function CheckoutPage() {
     setShip(emptyShipping);
     setMode("new");
     setErrors({});
-  }
-
-  if (!isAuthed) {
-    return (
-      <div className="py-20 text-center">
-        <p className="text-muted">Please sign in to check out.</p>
-        <Button className="mt-4" onClick={() => router.push("/login")}>
-          Sign in
-        </Button>
-      </div>
-    );
-  }
-  if (items.length === 0) {
-    return <p className="py-20 text-center text-muted">Your cart is empty.</p>;
   }
 
   async function applyCoupon() {
@@ -139,6 +171,15 @@ export default function CheckoutPage() {
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
 
+    // Placing an order is a commitment (COD, dispatched from Ooty) and is one of
+    // the actions the project rules require a confirmation for.
+    const ok = await askConfirm({
+      title: "Place this order?",
+      message: `${formatPrice(Math.max(0, subtotal - discount))} payable on delivery to ${ship.city} - ${ship.pincode}.`,
+      confirmText: "Place order",
+    });
+    if (!ok) return;
+
     setPlacing(true);
     try {
       // Save a brand-new address to the book if requested.
@@ -149,7 +190,7 @@ export default function CheckoutPage() {
           /* non-fatal — still place the order */
         }
       }
-      const order = await placeOrder(items, ship, code.trim() || undefined);
+      const order = await placeOrder(items, ship, code.trim() || undefined, deliveryNote.trim() || undefined);
       clear();
       toast.success("Order placed!");
       router.push(`/orders/${order.id}`);
@@ -172,118 +213,96 @@ export default function CheckoutPage() {
     }
   }
 
-  const total = Math.max(0, subtotal - discount);
+  // Both the cart and the session come from localStorage, so the server renders
+  // "empty cart / signed out" and the client renders the truth — React was
+  // reporting "Hydration failed… server HTML didn't match" on every checkout and
+  // throwing away the server tree. Wait for both stores before deciding.
+  if (!cartHydrated || !authHydrated) {
+    return (
+      <div className="py-20 text-center" aria-busy="true">
+        <Spinner />
+      </div>
+    );
+  }
+
+  if (!isAuthed) {
+    return (
+      <div className="py-20 text-center">
+        <p className="text-muted">Please sign in to check out.</p>
+        {/* Plain navigation belongs in a link, not a button driving router.push
+            — this keeps middle-click and open-in-new-tab working. */}
+        <Link href="/login?next=/checkout" className={buttonClasses({}, "mt-4")}>
+          Sign in
+        </Link>
+      </div>
+    );
+  }
+  if (items.length === 0) {
+    // Dead end otherwise: landing on checkout with an empty cart left the
+    // customer on a bare sentence with no way back into the shop.
+    return (
+      <div className="py-20 text-center">
+        <p className="text-muted">Your cart is empty.</p>
+        <Link href="/" className={buttonClasses({}, "mt-4")}>
+          Browse products
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
       <div>
         <h1 className="mb-4 font-display text-xl font-bold text-ink">Delivery address</h1>
 
-        {/* Saved addresses */}
-        {addresses.length > 0 && (
-          <div className="mb-4 grid gap-3 sm:grid-cols-2">
-            {addresses.map((a) => (
-              <button
-                key={a.id}
-                type="button"
-                onClick={() => pickSaved(a)}
-                className={cn(
-                  "rounded-2xl border p-4 text-left transition-colors",
-                  mode === "saved" && selectedId === a.id
-                    ? "border-brand-500 bg-brand-50"
-                    : "border-line bg-white hover:border-brand-300",
-                )}
-              >
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-ink">{a.name}</span>
-                  {a.is_default && (
-                    <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-semibold text-brand-700">
-                      Default
-                    </span>
-                  )}
-                </div>
-                <p className="mt-1 text-sm text-muted">
-                  {a.line1}
-                  {a.line2 ? `, ${a.line2}` : ""}, {a.city}, {a.state} - {a.pincode}
-                </p>
-                <p className="text-sm text-muted">{a.phone}</p>
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={newAddress}
-              className={cn(
-                "rounded-2xl border border-dashed p-4 text-left text-sm font-semibold transition-colors",
-                mode === "new" ? "border-brand-500 bg-brand-50 text-brand-700" : "border-line text-muted hover:border-brand-300",
-              )}
-            >
-              + Deliver to a new address
-            </button>
-          </div>
-        )}
+        <AddressBook
+          addresses={addresses}
+          selectedId={selectedId}
+          mode={mode}
+          onPick={pickSaved}
+          onNew={newAddress}
+        />
 
-        {/* Address form — for a new address, or editing the selected one */}
+        {/* Address form — for a new address, or when the book is empty. */}
         {(mode === "new" || addresses.length === 0) && (
           <div className="rounded-2xl border border-line bg-white p-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Input label="Full name" value={ship.name} onChange={set("name")} error={errors.name} />
-              <Input label="Phone" value={ship.phone} onChange={set("phone")} error={errors.phone} />
-              <div className="sm:col-span-2">
-                <Input label="Address line 1" value={ship.line1} onChange={set("line1")} error={errors.line1} />
-              </div>
-              <div className="sm:col-span-2">
-                <Input label="Address line 2 (optional)" value={ship.line2 ?? ""} onChange={set("line2")} />
-              </div>
-              <Input label="City" value={ship.city} onChange={set("city")} error={errors.city} />
-              <Input label="State" value={ship.state} onChange={set("state")} error={errors.state} />
-              <Input label="Pincode" value={ship.pincode} onChange={set("pincode")} error={errors.pincode} />
-            </div>
+            <AddressFields value={ship} set={(patch) => setShip((s) => ({ ...s, ...patch }))} errors={errors} />
             <label className="mt-3 flex items-center gap-2 text-sm text-muted">
               <input type="checkbox" checked={saveNew} onChange={(e) => setSaveNew(e.target.checked)} />
               Save this address for next time
             </label>
           </div>
         )}
+
+        <div className="mt-4">
+          <label htmlFor="delivery-note" className="mb-1 block text-sm font-medium text-ink">
+            Delivery instructions (optional)
+          </label>
+          <textarea
+            id="delivery-note"
+            value={deliveryNote}
+            onChange={(e) => setDeliveryNote(e.target.value)}
+            rows={2}
+            maxLength={280}
+            placeholder="E.g. Leave at the gate, call on arrival, landmark…"
+            className="w-full rounded-xl border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/25"
+          />
+        </div>
       </div>
 
-      <aside className="h-fit rounded-2xl border border-line bg-white p-5">
-        <h2 className="font-display font-bold text-ink">Order summary</h2>
-
-        <div className="mt-4 flex gap-2">
-          <input
-            className="h-10 flex-1 rounded-lg border border-line px-3 text-sm outline-none focus:border-brand-500"
-            placeholder="Coupon code"
-            value={code}
-            onChange={(e) => setCode(e.target.value.toUpperCase())}
-          />
-          <Button variant="secondary" onClick={applyCoupon}>
-            Apply
-          </Button>
-        </div>
-        {couponMsg && <p className="mt-2 text-xs text-muted">{couponMsg}</p>}
-
-        <div className="mt-4 space-y-1 text-sm">
-          <div className="flex justify-between">
-            <span className="text-muted">Subtotal</span>
-            <span>{formatPrice(subtotal)}</span>
-          </div>
-          {discount > 0 && (
-            <div className="flex justify-between text-brand-600">
-              <span>Discount</span>
-              <span>−{formatPrice(discount)}</span>
-            </div>
-          )}
-          <div className="flex justify-between border-t border-line pt-2 font-semibold">
-            <span>Total (COD)</span>
-            <span>{formatPrice(total)}</span>
-          </div>
-        </div>
-
-        {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
-        <Button className="mt-4 w-full" loading={placing} onClick={submit}>
-          Place order (Cash on Delivery)
-        </Button>
-      </aside>
+      <OrderSummary
+        code={code}
+        onCodeChange={setCode}
+        onApplyCoupon={applyCoupon}
+        couponMsg={couponMsg}
+        subtotal={subtotal}
+        discount={discount}
+        expressChecking={checkingExpress}
+        expressResult={express}
+        error={error}
+        placing={placing}
+        onPlace={submit}
+      />
     </div>
   );
 }

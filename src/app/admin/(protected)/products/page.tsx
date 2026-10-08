@@ -1,28 +1,24 @@
 "use client";
 import { askConfirm } from "@/lib/confirm";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Plus, Search } from "lucide-react";
+import type { ICellRendererParams } from "@/components/admin/gridHelpers";
 import type { Product } from "@/types";
-import {
-  adminListProducts,
-  adminCreateProduct,
-  adminDeleteProduct,
-  adminUpdateProduct,
-  adminAddImage,
-} from "@/lib/adminEndpoints";
-import { ApiException } from "@/lib/api";
+import { adminListProducts, adminDeleteProduct, adminUpdateProduct } from "@/lib/adminEndpoints";
 import { formatPrice } from "@/lib/format";
-import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
-import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { PageHeader } from "@/components/admin/PageHeader";
-import { ImageUpload } from "@/components/admin/ImageUpload";
+import { Pagination } from "@/components/admin/Pagination";
+import { useServerTable } from "@/components/admin/useServerTable";
+import { GridActions } from "@/components/admin/GridActions";
+import { DataGrid } from "@/components/admin/DataGrid";
+import { col, sortCol, actionCol } from "@/components/admin/gridHelpers";
 
-const slugify = (s: string) =>
-  s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+// Code-split: AG Grid is heavy — load it lazily and keep it out of the initial bundle.
 
 function priceRange(p: Product): string {
   const prices = p.variants.map((v) => v.price);
@@ -34,7 +30,6 @@ function priceRange(p: Product): string {
 
 const LOW_STOCK = 5;
 
-// Aggregate stock view for a product's active variants.
 function stockInfo(p: Product): { total: number; out: boolean; low: boolean } {
   const active = p.variants.filter((v) => v.is_active);
   const total = active.reduce((n, v) => n + v.stock_qty, 0);
@@ -43,58 +38,45 @@ function stockInfo(p: Product): { total: number; out: boolean; low: boolean } {
   return { total, out, low };
 }
 
+type Visibility = "" | "true" | "false";
+type StockFilter = "" | "in" | "low" | "out";
+
+const visibilityFilters: { value: Visibility; label: string }[] = [
+  { value: "", label: "All" },
+  { value: "true", label: "Active" },
+  { value: "false", label: "Hidden" },
+];
+const stockFilters: { value: StockFilter; label: string }[] = [
+  { value: "", label: "Any stock" },
+  { value: "in", label: "In stock" },
+  { value: "low", label: "Low" },
+  { value: "out", label: "Out of stock" },
+];
+
 export default function AdminProductsPage() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  const [search, setSearch] = useState("");
+  const [q, setQ] = useState("");
+  const [active, setActive] = useState<Visibility>("");
+  const [stock, setStock] = useState<StockFilter>("");
 
-  // Create form
-  const [name, setName] = useState("");
-  const [desc, setDesc] = useState("");
-  const [image, setImage] = useState("");
-  const [active, setActive] = useState(true);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [creating, setCreating] = useState(false);
+  // Debounce the search box into the query that drives the fetch.
+  useEffect(() => {
+    const t = setTimeout(() => setQ(search.trim()), 300);
+    return () => clearTimeout(t);
+  }, [search]);
 
-  function load() {
-    adminListProducts()
-      .then((d) => setProducts(d.products ?? []))
-      .finally(() => setLoading(false));
-  }
-  useEffect(load, []);
-
-  function validate(): boolean {
-    const e: Record<string, string> = {};
-    if (name.trim().length < 2) e.name = "Enter a product name (min 2 characters)";
-    if (!image.trim()) e.image = "A product image is required";
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  }
-
-  async function createProduct(e: React.FormEvent) {
-    e.preventDefault();
-    if (!validate()) return;
-    setCreating(true);
-    try {
-      const product = await adminCreateProduct({
-        name: name.trim(),
-        slug: slugify(name),
-        description: desc.trim() || undefined,
-        is_active: active,
-      });
-      // Attach the uploaded image as primary.
-      await adminAddImage(product.id, image.trim(), true);
-      setName("");
-      setDesc("");
-      setImage("");
-      setActive(true);
-      setErrors({});
-      load();
-    } catch (ex) {
-      setErrors({ form: ex instanceof ApiException ? ex.message : "Could not create product" });
-    } finally {
-      setCreating(false);
-    }
-  }
+  const fetcher = useCallback(
+    (p: { page: number; limit: number; sort?: string; order?: "asc" | "desc" }) =>
+      adminListProducts({
+        ...p,
+        q,
+        active: active || undefined,
+        stock: stock || undefined,
+      }).then((d) => ({ rows: d.products ?? [], total: d.total ?? 0 })),
+    [q, active, stock],
+  );
+  const grid = useServerTable<Product>(fetcher, { limit: 20, deps: [q, active, stock] });
 
   async function toggleVisible(p: Product) {
     await adminUpdateProduct(p.id, {
@@ -103,138 +85,136 @@ export default function AdminProductsPage() {
       description: p.description,
       is_active: !p.is_active,
     });
-    load();
+    grid.reload();
   }
 
   async function removeProduct(id: string) {
     if (!(await askConfirm({ title: "Delete product?", message: "This removes the product and all its variants.", tone: "danger", confirmText: "Delete" }))) return;
     await adminDeleteProduct(id);
-    load();
+    grid.reload();
   }
 
-  if (loading)
-    return (
-      <div className="flex justify-center py-20">
-        <Spinner />
-      </div>
-    );
+  const columnDefs = [
+    sortCol<Product>("name", "Product", {
+      minWidth: 240,
+      cellRenderer: (p: ICellRendererParams<Product>) => {
+        const prod = p.data;
+        if (!prod) return null;
+        const primary = prod.images.find((i) => i.is_primary) ?? prod.images[0];
+        return (
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-brand-50">
+              {primary ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={primary.url} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full items-center justify-center text-[8px] text-brand-300">No img</div>
+              )}
+            </div>
+            <div className="min-w-0 leading-tight">
+              <div className="flex items-center gap-1.5">
+                <span className="truncate font-semibold text-ink">{prod.name}</span>
+                {!prod.is_active && <Badge tone="neutral">Hidden</Badge>}
+              </div>
+              <span className="text-xs text-muted">{prod.slug}</span>
+            </div>
+          </div>
+        );
+      },
+    }),
+    col<Product>("variants", "Variants", {
+      maxWidth: 110,
+      sortable: false,
+      valueGetter: (p) => p.data?.variants.length ?? 0,
+      cellRenderer: (p: ICellRendererParams<Product>) => (
+        <Badge tone="brand">{p.value} variant{p.value === 1 ? "" : "s"}</Badge>
+      ),
+    }),
+    col<Product>("variants", "Price", {
+      colId: "price",
+      minWidth: 130,
+      sortable: false,
+      cellRenderer: (p: ICellRendererParams<Product>) => (p.data ? <span className="text-muted">{priceRange(p.data)}</span> : null),
+    }),
+    col<Product>("variants", "Stock", {
+      colId: "stock",
+      minWidth: 120,
+      sortable: false,
+      valueGetter: (p) => (p.data ? stockInfo(p.data).total : 0),
+      cellRenderer: (p: ICellRendererParams<Product>) => {
+        if (!p.data) return null;
+        const s = stockInfo(p.data);
+        if (s.out) return <Badge tone="danger">Out of stock</Badge>;
+        if (s.low) return <Badge tone="warning">Low · {s.total}</Badge>;
+        return <span className="text-muted">{s.total} in stock</span>;
+      },
+    }),
+    actionCol<Product>("", (p) => (
+      <GridActions
+        toggle={{ label: p.is_active ? "Hide" : "Show", onClick: () => toggleVisible(p) }}
+        onEdit={() => router.push(`/admin/products/${p.id}/edit`)}
+        onDelete={() => removeProduct(p.id)}
+      />
+    ), { minWidth: 240, maxWidth: 260 }),
+  ];
 
   return (
-    <div className="max-w-4xl">
-      <PageHeader title="Products" subtitle={`${products.length} in catalog`} />
+    <div>
+      <PageHeader
+        title="Products"
+        subtitle={`${grid.total} in catalog`}
+        breadcrumbs={[{ label: "Products" }]}
+        action={
+          <Button onClick={() => router.push("/admin/products/new")}>
+            <Plus className="h-4 w-4" /> Add product
+          </Button>
+        }
+      />
 
-      {/* Create form */}
-      <Card className="mb-6 p-5">
-        <form onSubmit={createProduct} className="flex flex-col gap-4">
-          <p className="text-sm font-semibold text-ink">New product</p>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Input label="Name *" value={name} onChange={(e) => setName(e.target.value)} error={errors.name} />
-            <Input label="Description" value={desc} onChange={(e) => setDesc(e.target.value)} />
-          </div>
-          {name && <p className="-mt-1 text-xs text-muted">slug: {slugify(name)}</p>}
-
-          {/* Image (required) */}
-          <div>
-            <p className="mb-1.5 text-sm font-medium text-ink">Product image *</p>
-            <div className="flex items-center gap-3">
-              <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-line bg-brand-50">
-                {image ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={image} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <div className="flex h-full items-center justify-center text-[10px] text-brand-300">No image</div>
-                )}
-              </div>
-              <div className="flex flex-col gap-2">
-                <ImageUpload folder="ootybites/products" label="Upload image" onUploaded={setImage} />
-                <input
-                  className="h-9 w-64 max-w-full rounded-lg border border-line px-2 text-sm"
-                  placeholder="…or paste an image URL"
-                  value={image}
-                  onChange={(e) => setImage(e.target.value)}
-                />
-              </div>
-            </div>
-            {errors.image && <p className="mt-1 text-xs text-red-600">{errors.image}</p>}
-          </div>
-
-          <label className="flex items-center gap-2 text-sm text-muted">
-            <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
-            Publish (visible in the shop)
-          </label>
-
-          {errors.form && <p className="text-sm text-red-600">{errors.form}</p>}
-          <div>
-            <Button type="submit" loading={creating}>
-              Add product
-            </Button>
-            <span className="ml-3 text-xs text-muted">Add variants (price &amp; stock) after creating, on Edit.</span>
-          </div>
-        </form>
-      </Card>
-
-      {/* List */}
-      {products.length === 0 ? (
-        <Card className="py-16 text-center text-sm text-muted">No products yet — add your first above.</Card>
-      ) : (
-        <div className="space-y-3">
-          {products.map((p) => {
-            const primary = p.images.find((i) => i.is_primary) ?? p.images[0];
-            return (
-              <Card key={p.id} className="flex items-center gap-4 p-3.5">
-                <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-brand-50">
-                  {primary ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={primary.url} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="flex h-full items-center justify-center text-[10px] text-brand-300">No image</div>
-                  )}
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="truncate font-semibold text-ink">{p.name}</p>
-                    {!p.is_active && <Badge tone="neutral">Hidden</Badge>}
-                  </div>
-                  <p className="truncate text-xs text-muted">{p.slug}</p>
-                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
-                    <Badge tone="brand">
-                      {p.variants.length} variant{p.variants.length === 1 ? "" : "s"}
-                    </Badge>
-                    <span>{priceRange(p)}</span>
-                    {(() => {
-                      const s = stockInfo(p);
-                      if (s.out) return <Badge tone="danger">Out of stock</Badge>;
-                      if (s.low) return <Badge tone="warning">Low stock</Badge>;
-                      return <span className="text-muted">· {s.total} in stock</span>;
-                    })()}
-                  </div>
-                </div>
-
-                <div className="flex shrink-0 items-center gap-3">
-                  <button
-                    onClick={() => toggleVisible(p)}
-                    className="rounded-full border border-line px-3 py-1.5 text-sm font-semibold text-muted hover:border-brand-400 hover:text-brand-600"
-                    title={p.is_active ? "Hide from shop" : "Show in shop"}
-                  >
-                    {p.is_active ? "Hide" : "Show"}
-                  </button>
-                  <Link
-                    href={`/admin/products/${p.id}/edit`}
-                    className="rounded-full bg-brand-50 px-3 py-1.5 text-sm font-semibold text-brand-700 hover:bg-brand-100"
-                  >
-                    Edit
-                  </Link>
-                  <button onClick={() => removeProduct(p.id)} className="text-sm font-medium text-red-600 hover:underline">
-                    Delete
-                  </button>
-                </div>
-              </Card>
-            );
-          })}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 sm:max-w-xs">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name or slug…"
+            className="h-10 w-full rounded-xl border border-line bg-white pl-9 pr-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/25"
+          />
         </div>
-      )}
+        <select
+          value={active}
+          onChange={(e) => setActive(e.target.value as Visibility)}
+          className="h-10 rounded-xl border border-line bg-white px-3 text-sm text-ink outline-none focus:border-brand-500"
+        >
+          {visibilityFilters.map((f) => (
+            <option key={f.value} value={f.value}>
+              {f.label}
+            </option>
+          ))}
+        </select>
+        <select
+          value={stock}
+          onChange={(e) => setStock(e.target.value as StockFilter)}
+          className="h-10 rounded-xl border border-line bg-white px-3 text-sm text-ink outline-none focus:border-brand-500"
+        >
+          {stockFilters.map((f) => (
+            <option key={f.value} value={f.value}>
+              {f.label}
+            </option>
+          ))}
+        </select>
+        <span className="ml-auto text-xs text-muted">Click the Product header to sort</span>
+      </div>
+      <DataGrid<Product>
+        rowData={grid.rows}
+        columnDefs={columnDefs}
+        loading={grid.loading}
+        getRowId={(p) => p.id}
+        onServerSort={grid.onServerSort}
+        emptyText={q || active || stock ? "No products match these filters." : "No products yet — add your first."}
+      />
+
+      <Pagination page={grid.page} total={grid.total} limit={grid.limit} onPage={grid.setPage} />
     </div>
   );
 }

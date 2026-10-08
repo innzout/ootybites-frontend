@@ -2,29 +2,23 @@
 import { askConfirm } from "@/lib/confirm";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Plus } from "lucide-react";
+import type { ICellRendererParams } from "@/components/admin/gridHelpers";
 import type { Dealer } from "@/types";
-import {
-  adminListDealers,
-  adminCreateDealer,
-  adminUpdateDealer,
-  adminDeleteDealer,
-} from "@/lib/adminEndpoints";
-import { ApiException } from "@/lib/api";
-import { Input } from "@/components/ui/Input";
+import { adminListDealers, adminUpdateDealer, adminDeleteDealer } from "@/lib/adminEndpoints";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
 import { PageHeader } from "@/components/admin/PageHeader";
-
-const empty = { name: "", mobile: "", address: "", username: "", password: "" };
+import { DataGrid } from "@/components/admin/DataGrid";
+import { GridActions } from "@/components/admin/GridActions";
+import { col, actionCol } from "@/components/admin/gridHelpers";
 
 export default function AdminDealersPage() {
+  const router = useRouter();
   const [dealers, setDealers] = useState<Dealer[]>([]);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState(empty);
-  const [error, setError] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
 
   function load() {
     adminListDealers()
@@ -32,21 +26,6 @@ export default function AdminDealersPage() {
       .finally(() => setLoading(false));
   }
   useEffect(load, []);
-
-  async function create(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setCreating(true);
-    try {
-      await adminCreateDealer({ ...form, address: form.address || null, is_active: true });
-      setForm(empty);
-      load();
-    } catch (ex) {
-      setError(ex instanceof ApiException ? ex.message : "Could not create dealer");
-    } finally {
-      setCreating(false);
-    }
-  }
 
   async function toggle(d: Dealer) {
     await adminUpdateDealer(d.id, {
@@ -72,62 +51,55 @@ export default function AdminDealersPage() {
       </div>
     );
 
-  return (
-    <div className="max-w-3xl">
-      <PageHeader title="Dealers" subtitle="Partners who fulfil assigned orders" />
-
-      <Card className="mb-6 p-4">
-        <form onSubmit={create} className="flex flex-col gap-3">
-          <p className="text-sm font-semibold text-ink">New dealer</p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Input label="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            <Input label="Mobile" value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value })} />
-            <div className="sm:col-span-2">
-              <Input label="Address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
-            </div>
-            <Input label="Username (login)" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
-            <Input label="Password" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
-          </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <div>
-            <Button type="submit" loading={creating} disabled={!form.name || !form.mobile || !form.username || !form.password}>
-              Add dealer
-            </Button>
-          </div>
-        </form>
-      </Card>
-
-      {dealers.length === 0 ? (
-        <Card className="py-16 text-center text-sm text-muted">No dealers yet.</Card>
-      ) : (
-        <div className="space-y-3">
-          {dealers.map((d) => (
-            <Card key={d.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <p className="font-semibold text-ink">{d.name}</p>
-                  <Badge tone={d.is_active ? "success" : "neutral"}>{d.is_active ? "Active" : "Disabled"}</Badge>
-                </div>
-                <p className="text-sm text-muted">
-                  {d.mobile} · @{d.username}
-                  {d.address ? ` · ${d.address}` : ""}
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => toggle(d)}
-                  className="rounded-full border border-line px-3 py-1.5 text-sm font-semibold text-muted hover:border-brand-400 hover:text-brand-600"
-                >
-                  {d.is_active ? "Disable" : "Enable"}
-                </button>
-                <button onClick={() => remove(d.id)} className="text-sm font-medium text-red-600 hover:underline">
-                  Delete
-                </button>
-              </div>
-            </Card>
-          ))}
+  const columnDefs = [
+    col<Dealer>("name", "Name", {
+      minWidth: 180,
+      cellRenderer: (p: ICellRendererParams<Dealer>) => (
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-ink">{p.value}</span>
+          <Badge tone={p.data?.is_active ? "success" : "neutral"}>{p.data?.is_active ? "Active" : "Off"}</Badge>
         </div>
-      )}
+      ),
+    }),
+    col<Dealer>("mobile", "Contact", {
+      minWidth: 200,
+      cellRenderer: (p: ICellRendererParams<Dealer>) => (
+        <span className="text-muted">
+          {p.data?.mobile} · @{p.data?.username}
+          {p.data?.address ? ` · ${p.data.address}` : ""}
+        </span>
+      ),
+    }),
+    actionCol<Dealer>("", (d) => (
+      <GridActions
+        toggle={{ label: d.is_active ? "Disable" : "Enable", onClick: () => toggle(d) }}
+        onEdit={() => router.push(`/admin/dealers/${d.id}/edit`)}
+        onDelete={() => remove(d.id)}
+      />
+    ), { minWidth: 240, maxWidth: 260 }),
+  ];
+
+  return (
+    <div>
+      <PageHeader
+        title="Dealers"
+        subtitle="Partners who fulfil assigned orders"
+        breadcrumbs={[{ label: "Dealers" }]}
+        action={
+          <Button onClick={() => router.push("/admin/dealers/new")}>
+            <Plus className="h-4 w-4" /> Add dealer
+          </Button>
+        }
+      />
+      <DataGrid<Dealer>
+        rowData={dealers}
+        columnDefs={columnDefs}
+        getRowId={(d) => d.id}
+        sortable
+        pagination
+        pageSize={10}
+        emptyText="No dealers yet — add your first."
+      />
     </div>
   );
 }

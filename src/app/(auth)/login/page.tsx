@@ -46,7 +46,10 @@ export default function LoginPage() {
     try {
       const res = await verifyOTP(phone, code);
       login(res.token, res.customer);
-      router.push("/");
+      // Return to where the user was headed (?next=/…), else home.
+      const n = new URLSearchParams(window.location.search).get("next");
+      const dest = n && n.startsWith("/") && !n.startsWith("//") ? n : "/";
+      router.push(dest);
     } catch (ex) {
       setError(ex instanceof ApiException ? ex.message : "Could not verify code");
     } finally {

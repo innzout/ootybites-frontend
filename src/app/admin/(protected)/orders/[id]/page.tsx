@@ -16,10 +16,12 @@ import { formatPrice, formatDate } from "@/lib/format";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Spinner } from "@/components/ui/Spinner";
 import { Button } from "@/components/ui/Button";
+import { OrderLocationMap } from "@/components/admin/OrderLocationMap";
+import { DeliveryHandoff } from "@/components/admin/DeliveryHandoff";
 
 // Next allowed statuses per the server state machine (mirrored for the UI).
 const nextStatuses: Record<OrderStatus, OrderStatus[]> = {
-  placed: ["reached_dealer", "cancelled"],
+  placed: ["delivered", "cancelled"],
   reached_dealer: ["delivered", "cancelled"],
   delivered: [],
   cancelled: [],
@@ -233,6 +235,13 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
           {order.ship_line1}
           {order.ship_line2 ? `, ${order.ship_line2}` : ""}, {order.ship_city}, {order.ship_state} - {order.ship_pincode}
         </p>
+        {order.delivery_note && (
+          <p className="mt-2 rounded-lg bg-accent-300/20 px-2.5 py-1.5 text-ink">
+            <span className="font-semibold">Delivery note:</span> {order.delivery_note}
+          </p>
+        )}
+        <OrderLocationMap lat={order.ship_lat} lng={order.ship_lng} label={order.ship_name} />
+        <DeliveryHandoff order={order} />
       </div>
 
       {/* History + note */}

@@ -3,30 +3,21 @@
 import { useCallback, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import dynamic from "next/dynamic";
-import type { ICellRendererParams } from "ag-grid-community";
+import type { ICellRendererParams } from "@/components/admin/gridHelpers";
 import type { Order, OrderStatus } from "@/types";
 import { adminListOrders } from "@/lib/adminEndpoints";
 import { formatPrice, formatDate, daysSince } from "@/lib/format";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { Card } from "@/components/ui/Card";
 import { Spinner } from "@/components/ui/Spinner";
 import { PageHeader } from "@/components/admin/PageHeader";
 import { Pagination } from "@/components/admin/Pagination";
 import { useServerTable } from "@/components/admin/useServerTable";
+import { DataGrid } from "@/components/admin/DataGrid";
 import { col, sortCol } from "@/components/admin/gridHelpers";
 import { cn } from "@/lib/cn";
 
 // Code-split: AG Grid is heavy, so load it lazily and keep it out of the initial
 // admin bundle (client-only — the grid has no SSR value here).
-const DataGrid = dynamic(() => import("@/components/admin/DataGrid").then((m) => m.DataGrid), {
-  ssr: false,
-  loading: () => (
-    <div className="flex justify-center py-16">
-      <Spinner />
-    </div>
-  ),
-}) as typeof import("@/components/admin/DataGrid").DataGrid;
 
 const statuses = [
   { value: "", label: "All" },
@@ -94,7 +85,7 @@ export default function AdminOrdersPage() {
 
   return (
     <div>
-      <PageHeader title="Orders" subtitle={`${grid.total} order${grid.total === 1 ? "" : "s"} total`} />
+      <PageHeader title="Orders" subtitle={`${grid.total} order${grid.total === 1 ? "" : "s"} total`} breadcrumbs={[{ label: "Orders" }]} />
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         {statuses.map((s) => (
@@ -113,18 +104,15 @@ export default function AdminOrdersPage() {
         ))}
         <span className="ml-auto text-xs text-muted">Click a column header to sort</span>
       </div>
-
-      <Card className="overflow-hidden p-1.5">
-        <DataGrid<Order>
-          rowData={grid.rows}
-          columnDefs={columnDefs}
-          loading={grid.loading}
-          getRowId={(o) => o.id}
-          onRowClicked={(o) => router.push(`/admin/orders/${o.id}`)}
-          onServerSort={grid.onServerSort}
-          emptyText="No orders match this filter."
-        />
-      </Card>
+      <DataGrid<Order>
+        rowData={grid.rows}
+        columnDefs={columnDefs}
+        loading={grid.loading}
+        getRowId={(o) => o.id}
+        onRowClicked={(o) => router.push(`/admin/orders/${o.id}`)}
+        onServerSort={grid.onServerSort}
+        emptyText="No orders match this filter."
+      />
 
       <Pagination page={grid.page} total={grid.total} limit={grid.limit} onPage={grid.setPage} />
     </div>

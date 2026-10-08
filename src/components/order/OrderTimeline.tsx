@@ -2,10 +2,9 @@ import type { Order, OrderStatus } from "@/types";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/cn";
 
-// The happy-path journey. `cancelled` is handled separately (off-path).
+// The happy-path journey (placed → delivered). `cancelled` is off-path.
 const STEPS: { status: OrderStatus; label: string; hint: string }[] = [
   { status: "placed", label: "Order placed", hint: "We’ve received your order" },
-  { status: "reached_dealer", label: "Reached dealer", hint: "Handed to our Ooty dealer" },
   { status: "delivered", label: "Delivered", hint: "Enjoy your Ooty bites!" },
 ];
 

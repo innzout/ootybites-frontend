@@ -71,10 +71,10 @@ export default function AdminLoginPage() {
           </Button>
         </div>
 
-        <p className="mt-5 rounded-lg bg-brand-50 px-3 py-2 text-center text-xs text-brand-700">
-          Dev login — <span className="font-semibold">admin</span> /{" "}
-          <span className="font-semibold">AdminOB@2026</span>
-        </p>
+        {/* The bootstrap admin credentials used to be printed here. That shipped
+            the real password in the client bundle and rendered it on the public
+            login page, so anyone who loaded /admin/login could sign in. Read them
+            from backend/.env (ADMIN_USER / ADMIN_PASS) instead. */}
       </form>
     </div>
   );

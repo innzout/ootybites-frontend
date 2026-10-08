@@ -1,12 +1,15 @@
+import type { Metadata } from "next";
+import { ContentPage } from "@/components/shop/ContentPage";
+
+// Admin-editable CMS content — render on demand so edits show without a rebuild.
+export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Terms & Conditions",
+  description: "The terms and conditions for shopping with Ootybites.",
+  alternates: { canonical: "/terms" },
+};
+
 export default function TermsPage() {
-  return (
-    <article className="prose mx-auto max-w-2xl">
-      <h1 className="text-2xl font-bold text-neutral-800">Terms &amp; Conditions</h1>
-      <p className="mt-4 text-neutral-600">
-        Ootybites sells Nilgiris/Ooty products on a Cash-on-Delivery basis. Orders are confirmed at
-        placement; prices and availability are re-checked on our servers before an order is accepted.
-        Full terms will be published here.
-      </p>
-    </article>
-  );
+  return <ContentPage slug="terms" />;
 }

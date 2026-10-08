@@ -5,6 +5,10 @@
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/api";
 
+// Upper bound on any single API call. Long enough for a slow cold query, short
+// enough that a wedged backend surfaces as an error instead of a forever-spinner.
+const REQUEST_TIMEOUT_MS = 15_000;
+
 // Mirrors backend pkg/response.Envelope.
 export interface ApiError {
   code: string;
@@ -74,12 +78,33 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
     if (token) headers.Authorization = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method: opts.method ?? "GET",
-    headers,
-    body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
-    signal: opts.signal,
-  });
+  // A hung backend must not hang the UI forever — without this a request has no
+  // upper bound and the screen sits on a spinner indefinitely.
+  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  const signal = opts.signal ? AbortSignal.any([opts.signal, timeout]) : timeout;
+
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, {
+      method: opts.method ?? "GET",
+      headers,
+      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+      signal,
+    });
+  } catch (e) {
+    // fetch() rejects (rather than resolving with an error status) when the
+    // server is unreachable, DNS fails, CORS blocks the request, or we aborted.
+    // This was previously uncaught: a raw TypeError escaped as a render crash
+    // ("This screen failed to load") instead of a handled, explicable error.
+    if (opts.signal?.aborted) throw e; // caller cancelled on purpose
+    const timedOut = e instanceof DOMException && e.name === "TimeoutError";
+    throw new ApiException(0, {
+      code: timedOut ? "timeout" : "unreachable",
+      message: timedOut
+        ? "The server took too long to respond. Please try again."
+        : "Cannot reach the server. Check that the API is running, then retry.",
+    });
+  }
 
   let env: Envelope<T>;
   try {

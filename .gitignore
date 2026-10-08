@@ -21,3 +21,8 @@ yarn-error.log*
 Thumbs.db
 .idea/
 .vscode/
+
+# Licensed stock photography — the full-res AdobeStock originals must not be
+# redistributed in a public repo. public/hero/* holds the derived, optimised
+# asset the app actually ships; regenerate from your own licensed copy.
+brand-kit/source/nilgiris-*.jpeg

@@ -35,6 +35,7 @@ export interface Product {
   slug: string;
   description?: string;
   is_active: boolean;
+  category_id?: string | null;
   images: ProductImage[];
   variants: Variant[];
 }
@@ -48,6 +49,8 @@ export interface Address {
   city: string;
   state: string;
   pincode: string;
+  lat?: number | null;
+  lng?: number | null;
   is_default: boolean;
 }
 
@@ -92,9 +95,14 @@ export interface Order {
   ship_city: string;
   ship_state: string;
   ship_pincode: string;
+  ship_lat?: number | null;
+  ship_lng?: number | null;
   placed_at: string;
   dealer_id?: string | null;
   dealer_name?: string | null;
+  hub_id?: string | null;
+  is_express?: boolean;
+  delivery_note?: string | null;
   items: OrderItem[];
   history?: OrderStatusHistory[];
 }
@@ -112,14 +120,68 @@ export interface CouponPreview {
   reason?: string;
 }
 
+export interface Vendor {
+  id: string;
+  name: string;
+  phone?: string | null;
+  location: string;
+  notes?: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface StockRow {
+  variant_id: string;
+  product_id: string;
+  product_name: string;
+  variant_label: string;
+  sku?: string | null;
+  stock_qty: number;
+  price: number;
+  is_active: boolean;
+}
+
+export interface StockMovement {
+  id: string;
+  variant_id: string;
+  delta: number;
+  reason: "purchase" | "sale" | "cancel_restore" | "adjustment";
+  vendor_id?: string | null;
+  vendor_name?: string | null;
+  order_id?: string | null;
+  order_number?: string | null;
+  unit_cost?: number | null;
+  note?: string | null;
+  created_at: string;
+}
+
+export interface Notification {
+  id: string;
+  title: string;
+  body?: string | null;
+  order_id?: string | null;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface Hub {
+  id: string;
+  name: string;
+  dealer_id?: string | null;
+  dealer_name?: string | null;
+  is_active: boolean;
+  area_count: number;
+  created_at: string;
+}
+
 export interface Area {
   id: string;
   code: string;
   name: string;
   city: string;
   pincode: string;
-  dealer_id?: string | null;
-  dealer_name?: string | null;
+  hub_id?: string | null;
+  hub_name?: string | null;
   is_active: boolean;
   created_at: string;
 }
