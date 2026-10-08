@@ -1,13 +1,14 @@
 "use client";
 
 import { MapPin, ExternalLink } from "lucide-react";
+import { useMapsConfig } from "@/components/shop/MapsConfig";
 
-const KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
 // OrderLocationMap shows the customer's delivery pin for an order: an embedded
 // Google map (Maps Embed API, gated on the key) plus an always-working
 // "Open in Google Maps" link. Renders nothing when the order has no pin.
 export function OrderLocationMap({ lat, lng, label }: { lat?: number | null; lng?: number | null; label?: string }) {
+  const { apiKey: KEY } = useMapsConfig();
   if (lat == null || lng == null) return null;
   const gmaps = `https://www.google.com/maps?q=${lat},${lng}`;
 

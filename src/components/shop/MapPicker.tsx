@@ -2,10 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { MapPin, LocateFixed, AlertTriangle } from "lucide-react";
+import { useMapsConfig } from "@/components/shop/MapsConfig";
 import { cn } from "@/lib/cn";
 
 // MapPicker is a Google-Maps location picker for the delivery address. It is
-// gated on NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: when the key is absent it renders a
+// gated on the Maps key from MapsConfig (server-delivered, see that file): when
+// the key is absent it renders a
 // small fallback note and the manual address fields remain the source of truth.
 // Dropping/dragging the pin reverse-geocodes to fill city / pincode / line1.
 //
@@ -15,15 +17,13 @@ import { cn } from "@/lib/cn";
 // returned nothing — the search box rendered and looked functional while doing
 // nothing. If neither path initialises the box is hidden rather than left dead.
 
-const KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 // Default centre: Ooty, Nilgiris (where Ootybites ships from).
 const DEFAULT_CENTER = { lat: 11.4102, lng: 76.695 };
 
 // AdvancedMarkerElement only renders on a map that has a Map ID. DEMO_MAP_ID
 // works for development; create a real one in Cloud Console > Map Management
-// and set NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID for production, otherwise Google may
-// rate-limit or change the demo ID's behaviour.
-const MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID || "DEMO_MAP_ID";
+// and set GOOGLE_MAPS_MAP_ID for production, otherwise Google may rate-limit or
+// change the demo ID's behaviour.
 
 // The classic Marker uses setPosition()/getPosition(); AdvancedMarkerElement
 // exposes a plain `position` property. One pair of helpers so the rest of the
@@ -48,7 +48,7 @@ function toLatLng(v: any): { lat: number; lng: number } {
 }
 
 let loaderPromise: Promise<void> | null = null;
-function loadMaps(): Promise<void> {
+function loadMaps(KEY: string): Promise<void> {
   if (typeof window === "undefined") return Promise.reject(new Error("no window"));
   if ((window as any).google?.maps) return Promise.resolve();
   if (loaderPromise) return loaderPromise;
@@ -92,6 +92,7 @@ export function MapPicker({
   const [failed, setFailed] = useState(false);
   // null = still deciding, false = no Places API, true = search is live.
   const [searchReady, setSearchReady] = useState<boolean | null>(null);
+  const { apiKey: KEY, mapId: MAP_ID } = useMapsConfig();
   const [locating, setLocating] = useState(false);
   const [locateMsg, setLocateMsg] = useState<string | null>(null);
   const accuracyCircleRef = useRef<any>(null);
@@ -112,7 +113,7 @@ export function MapPicker({
       );
       setFailed(true);
     };
-    loadMaps()
+    loadMaps(KEY)
       .then(async () => {
         if (cancelled || !divRef.current) return;
         const g = (window as any).google;

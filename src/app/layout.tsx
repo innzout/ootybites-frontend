@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Bricolage_Grotesque, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { MapsConfigProvider } from "@/components/shop/MapsConfig";
 import { Toaster } from "@/components/ui/Toaster";
 import { DEFAULT_DESCRIPTION, SITE_KEYWORDS, SITE_NAME, SITE_URL } from "@/lib/seo";
 
@@ -72,7 +73,14 @@ export default function RootLayout({
         >
           Skip to content
         </a>
-        {children}
+        {/* Read server-side (no NEXT_PUBLIC_ prefix available) and handed to the
+            client components that need them. See MapsConfig for why. */}
+        <MapsConfigProvider
+          apiKey={process.env.GOOGLE_MAPS_API_KEY}
+          mapId={process.env.GOOGLE_MAPS_MAP_ID}
+        >
+          {children}
+        </MapsConfigProvider>
         <ConfirmDialog />
         <Toaster />
       </body>

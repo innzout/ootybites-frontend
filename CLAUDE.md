@@ -77,7 +77,9 @@ CLOUDINARY_API_SECRET=
 # frontend
 NEXT_PUBLIC_API_BASE_URL=
 NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=
-NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=   # address/checkout map picker (optional; degrades to manual entry)
+GOOGLE_MAPS_API_KEY=               # address/checkout map picker (optional; degrades to manual entry)
+                                   # NOT NEXT_PUBLIC_ — server-read, passed via MapsConfig
+GOOGLE_MAPS_MAP_ID=                # optional; DEMO_MAP_ID used when unset
 ```
 
 ## Build order (scaffolding plan)

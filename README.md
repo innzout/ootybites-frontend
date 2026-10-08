@@ -24,12 +24,17 @@ if this repo is ever nested.**
 |---|---|
 | `NEXT_PUBLIC_API_BASE_URL` | the Railway URL + `/api`, e.g. `https://<svc>.up.railway.app/api` |
 | `NEXT_PUBLIC_SITE_URL` | the Vercel URL until a domain is bought — drives canonicals, sitemap and OG tags |
-| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | optional; without it the address picker degrades to manual entry |
-| `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` | optional; `DEMO_MAP_ID` is used otherwise — create a real one before launch |
+| `GOOGLE_MAPS_API_KEY` | optional; **no** `NEXT_PUBLIC_` prefix — read server-side in `app/layout.tsx` and passed to the client via `MapsConfig`. Without it the address picker degrades to manual entry |
+| `GOOGLE_MAPS_MAP_ID` | optional; `DEMO_MAP_ID` is used otherwise — create a real one before launch |
 | `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME` | optional |
 
 Every `NEXT_PUBLIC_*` value is **inlined at build time**, so changing one needs a
-redeploy, not just a restart.
+redeploy, not just a restart. The two `GOOGLE_MAPS_*` variables are deliberately
+unprefixed and read per request, so rotating the Maps key only needs a restart.
+
+That does **not** make the Maps key secret — a Maps JavaScript key always reaches
+the browser. Its protection is the HTTP-referrer and API restrictions set on it
+in Google Cloud.
 
 ### Before a domain is bought
 
