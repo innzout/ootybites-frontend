@@ -26,3 +26,4 @@ Thumbs.db
 # redistributed in a public repo. public/hero/* holds the derived, optimised
 # asset the app actually ships; regenerate from your own licensed copy.
 brand-kit/source/nilgiris-*.jpeg
+*.tsbuildinfo
