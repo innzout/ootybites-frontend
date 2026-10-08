@@ -275,6 +275,8 @@ export interface UploadSignature {
   timestamp: number;
   folder: string;
   signature: string;
+  /** Present only when CLOUDINARY_UPLOAD_PRESET is set; must be a signed preset. */
+  upload_preset?: string;
 }
 export const adminSignUpload = (folder: string) =>
   adminApi.post<UploadSignature>(`/admin/uploads/sign?folder=${encodeURIComponent(folder)}`);
