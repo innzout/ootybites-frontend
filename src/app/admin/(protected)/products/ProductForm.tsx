@@ -11,6 +11,12 @@ import { Input } from "@/components/ui/Input";
 import { FormShell } from "@/components/admin/FormShell";
 import { ImageUpload } from "@/components/admin/ImageUpload";
 
+// Matches the shared <Input> primitive so the variant grid does not look like a
+// different form from the fields above it.
+const vLabel = "text-xs font-medium text-muted";
+const vField =
+  "h-9 rounded-lg border border-line bg-white px-2.5 text-sm text-ink outline-none transition-colors focus:border-brand-500 focus:ring-2 focus:ring-brand-500/25";
+
 const UNITS = ["mg", "g", "kg", "ml", "l", "nos", "packets"];
 
 const slugify = (s: string) =>
@@ -161,24 +167,86 @@ export function ProductForm() {
               <Plus className="h-3.5 w-3.5" /> Add variant
             </button>
           </div>
-          <div className="space-y-2">
+          {/* Every field carries a real <label>. These were placeholder-only, which
+              fails twice: the label vanishes the moment a value is typed (so a
+              filled row gives no way to tell MRP from Price), and a placeholder
+              is not an accessible name, so a screen reader announced six
+              unlabelled boxes. Price and MRP also now show the currency. */}
+          <div className="space-y-3">
             {variants.map((v, i) => (
-              <div key={i} className="rounded-xl border border-line p-2.5">
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-6">
-                  <input className="col-span-2 rounded-lg border border-line px-2 py-1.5 text-sm" placeholder="Label (auto)" value={v.label} onChange={(e) => setVariant(i, { label: e.target.value })} />
-                  <select className="rounded-lg border border-line px-2 py-1.5 text-sm" value={v.unit} onChange={(e) => setVariant(i, { unit: e.target.value })}>
-                    {UNITS.map((u) => (
-                      <option key={u}>{u}</option>
-                    ))}
-                  </select>
-                  <input className="rounded-lg border border-line px-2 py-1.5 text-sm" placeholder="Unit val" value={v.unit_value} onChange={(e) => setVariant(i, { unit_value: e.target.value })} />
-                  <input className="rounded-lg border border-line px-2 py-1.5 text-sm" placeholder="MRP" value={v.mrp} onChange={(e) => setVariant(i, { mrp: e.target.value })} />
-                  <input className="rounded-lg border border-line px-2 py-1.5 text-sm" placeholder="Price" value={v.price} onChange={(e) => setVariant(i, { price: e.target.value })} />
+              <div key={i} className="rounded-xl border border-line bg-surface/60 p-3">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
+                  <label className="col-span-2 flex flex-col gap-1">
+                    <span className={vLabel}>Label</span>
+                    <input
+                      className={vField}
+                      placeholder="Auto from unit"
+                      value={v.label}
+                      onChange={(e) => setVariant(i, { label: e.target.value })}
+                    />
+                  </label>
+
+                  <label className="flex flex-col gap-1">
+                    <span className={vLabel}>Unit</span>
+                    <select className={vField} value={v.unit} onChange={(e) => setVariant(i, { unit: e.target.value })}>
+                      {UNITS.map((u) => (
+                        <option key={u}>{u}</option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="flex flex-col gap-1">
+                    <span className={vLabel}>Amount</span>
+                    <input
+                      className={vField}
+                      inputMode="decimal"
+                      placeholder="250"
+                      value={v.unit_value}
+                      onChange={(e) => setVariant(i, { unit_value: e.target.value })}
+                    />
+                  </label>
+
+                  <label className="flex flex-col gap-1">
+                    <span className={vLabel}>MRP (₹)</span>
+                    <input
+                      className={vField}
+                      inputMode="decimal"
+                      placeholder="0"
+                      value={v.mrp}
+                      onChange={(e) => setVariant(i, { mrp: e.target.value })}
+                    />
+                  </label>
+
+                  <label className="flex flex-col gap-1">
+                    <span className={vLabel}>Price (₹)</span>
+                    <input
+                      className={vField}
+                      inputMode="decimal"
+                      placeholder="0"
+                      value={v.price}
+                      onChange={(e) => setVariant(i, { price: e.target.value })}
+                    />
+                  </label>
                 </div>
-                <div className="mt-2 flex items-center gap-2">
-                  <input className="w-28 rounded-lg border border-line px-2 py-1.5 text-sm" placeholder="Stock qty" value={v.stock_qty} onChange={(e) => setVariant(i, { stock_qty: e.target.value })} />
+
+                <div className="mt-3 flex items-end gap-3">
+                  <label className="flex flex-col gap-1">
+                    <span className={vLabel}>Stock</span>
+                    <input
+                      className={`${vField} w-28`}
+                      inputMode="numeric"
+                      placeholder="0"
+                      value={v.stock_qty}
+                      onChange={(e) => setVariant(i, { stock_qty: e.target.value })}
+                    />
+                  </label>
                   {variants.length > 1 && (
-                    <button type="button" onClick={() => removeVariant(i)} className="ml-auto inline-flex items-center gap-1 text-sm text-red-600 hover:underline">
+                    <button
+                      type="button"
+                      onClick={() => removeVariant(i)}
+                      aria-label={`Remove variant ${i + 1}`}
+                      className="ml-auto inline-flex items-center gap-1 rounded-full px-2 py-1.5 text-sm text-red-600 transition-colors hover:bg-red-50"
+                    >
                       <Trash2 className="h-3.5 w-3.5" /> Remove
                     </button>
                   )}

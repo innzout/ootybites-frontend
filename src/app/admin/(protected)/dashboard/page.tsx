@@ -139,15 +139,18 @@ function DashboardBody({ stats }: { stats: DashboardStats }) {
   const c = stats.counts_by_status;
   return (
     <>
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      {/* Two headline numbers only. "Awaiting dispatch" and "Delivered" used to
+          sit here as well as in the status breakdown below — the same figure in
+          two different treatments, which makes the reader stop and check whether
+          they are actually different. The breakdown owns the per-status counts. */}
+      <div className="grid gap-3 sm:gap-4 sm:grid-cols-2">
         <StatCard label="Orders" value={stats.total_orders} tone="brand" icon="▦" hint="In range" />
         <StatCard label="Revenue" value={formatPrice(stats.revenue)} tone="success" icon="₹" hint="Delivered, in range" />
-        <StatCard label="Awaiting dispatch" value={c.placed ?? 0} tone="accent" icon="⏱" />
-        <StatCard label="Delivered" value={c.delivered ?? 0} tone="info" icon="✓" />
       </div>
 
-      {/* Status breakdown */}
-      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {/* Status breakdown — the complete picture, in the order work moves. */}
+      <h2 className="mt-7 text-sm font-semibold text-muted">Orders by status</h2>
+      <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {(["placed", "reached_dealer", "delivered", "cancelled"] as const).map((s) => (
           <Card key={s} className="flex items-center justify-between p-3">
             <StatusBadge status={s} />

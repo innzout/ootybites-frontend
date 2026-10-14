@@ -6,8 +6,8 @@ import { ArrowDown } from "lucide-react";
 // The storefront's brand moment: a real photograph of the Nilgiris behind the
 // one sentence that says what this shop actually sells.
 //
-// This replaced a generated WebGL ridge line (HillsCanvas, still in the repo but
-// no longer used). The shader cost zero download, which the photo does not — so
+// This replaced a generated WebGL ridge line (since deleted). The shader cost
+// zero download, which the photo does not — so
 // the photo is served as a single WebP master that next/image narrows to the
 // device's width and re-encodes to AVIF where supported, and it is marked
 // priority because it IS the LCP element. Source art lives outside public/ in
