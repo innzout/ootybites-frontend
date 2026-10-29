@@ -6,6 +6,10 @@ import { adminLogin } from "@/lib/adminEndpoints";
 import { ApiException } from "@/lib/api";
 import { useAdminAuthStore } from "@/store/adminAuthStore";
 import { Input } from "@/components/ui/Input";
+import { useFieldErrors } from "@/lib/useFieldErrors";
+import { required } from "@/lib/validators";
+
+const schema = { username: [required], password: [required] };
 import { Button } from "@/components/ui/Button";
 import { BrandMark } from "@/components/ui/BrandMark";
 
@@ -14,11 +18,13 @@ export default function AdminLoginPage() {
   const login = useAdminAuthStore((s) => s.login);
   const [username, setUsername] = useState("");
   const [pass, setPass] = useState("");
+  const { errors, validateAll, revalidate, validateOnBlur } = useFieldErrors(schema);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!validateAll({ username, password: pass })) return;
     setError(null);
     setBusy(true);
     try {
@@ -55,7 +61,9 @@ export default function AdminLoginPage() {
             name="ob-admin-user"
             autoComplete="off"
             value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            onChange={(e) => { setUsername(e.target.value); revalidate("username", e.target.value); }}
+            onBlur={() => validateOnBlur("username", username)}
+            error={errors.username}
           />
           <Input
             label="Password"
@@ -63,8 +71,12 @@ export default function AdminLoginPage() {
             name="ob-admin-pass"
             autoComplete="new-password"
             value={pass}
-            onChange={(e) => setPass(e.target.value)}
-            error={error}
+            onChange={(e) => { setPass(e.target.value); revalidate("password", e.target.value); }}
+            onBlur={() => validateOnBlur("password", pass)}
+            // The server's "invalid credentials" is deliberately shown on the
+            // password field; a local "required" check takes precedence while
+            // the field is empty.
+            error={errors.password ?? error}
           />
           <Button type="submit" size="lg" loading={busy} className="w-full">
             Sign in

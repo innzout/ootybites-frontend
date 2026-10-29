@@ -7,6 +7,7 @@ import type { Page } from "@/lib/endpoints";
 import { ApiException } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { Input } from "@/components/ui/Input";
+import { useClearableErrors } from "@/lib/useFieldErrors";
 import { FormShell } from "@/components/admin/FormShell";
 
 const crumbs = (label: string) => [{ label: "Content", href: "/admin/pages" }, { label }];
@@ -21,7 +22,7 @@ export function PageForm({ page }: { page?: Page }) {
     body: page?.body ?? "",
     is_published: page?.is_published ?? true,
   });
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const { errors, setErrors, clearField } = useClearableErrors();
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -62,12 +63,12 @@ export function PageForm({ page }: { page?: Page }) {
       error={error}
     >
       <div className="grid gap-4 sm:grid-cols-2">
-        <Input label="Title" requiredMark value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} error={errors.title} />
+        <Input label="Title" requiredMark value={form.title} onChange={(e) => { setForm({ ...form, title: e.target.value }); clearField("title"); }} error={errors.title} />
         <Input
           label="Slug (URL)"
           requiredMark
           value={form.slug}
-          onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") })}
+          onChange={(e) => { setForm({ ...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") }); clearField("slug"); }}
           error={errors.slug}
           placeholder="terms"
         />

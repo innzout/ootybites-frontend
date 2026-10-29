@@ -8,6 +8,17 @@ import { ApiException } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { Input } from "@/components/ui/Input";
 import { FormShell } from "@/components/admin/FormShell";
+import { useFieldErrors } from "@/lib/useFieldErrors";
+import { required, percent, nonNegativeNumber, optional, maxLength } from "@/lib/validators";
+
+// percent mirrors the server rule (0 < value <= 100), so an out-of-range
+// discount is caught here instead of after a failed round trip.
+const schema = {
+  code: [required, maxLength(40)],
+  discount_value: [percent],
+  min_order_value: [optional(nonNegativeNumber)],
+  max_discount_cap: [optional(nonNegativeNumber)],
+};
 import { ProductMultiSelect } from "@/components/admin/ProductMultiSelect";
 
 type Scope = "all" | "specific_products";
@@ -24,12 +35,18 @@ export function CouponForm({ coupon }: { coupon?: Coupon }) {
   });
   const [scope, setScope] = useState<Scope>(coupon?.applicable_scope === "specific_products" ? "specific_products" : "all");
   const [productIds, setProductIds] = useState<string[]>(coupon?.product_ids ?? []);
+  const { errors, validateAll, revalidatePatch, validateOnBlur } = useFieldErrors(schema);
+  function patch(p: Partial<typeof form>) {
+    setForm((f) => ({ ...f, ...p }));
+    revalidatePatch(p as Record<string, unknown>);
+  }
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!validateAll(form)) return;
     if (scope === "specific_products" && productIds.length === 0) {
       setError("Select at least one product for a product-specific coupon");
       return;
@@ -78,10 +95,10 @@ export function CouponForm({ coupon }: { coupon?: Coupon }) {
       maxWidth="max-w-3xl"
     >
       <div className="grid gap-4 sm:grid-cols-4">
-        <Input label="Code" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} />
-        <Input label="Discount %" value={form.discount_value} onChange={(e) => setForm({ ...form, discount_value: e.target.value })} />
-        <Input label="Min order ₹" value={form.min_order_value} onChange={(e) => setForm({ ...form, min_order_value: e.target.value })} />
-        <Input label="Max cap ₹" value={form.max_discount_cap} onChange={(e) => setForm({ ...form, max_discount_cap: e.target.value })} />
+        <Input label="Code" requiredMark value={form.code} onChange={(e) => patch({ code: e.target.value.toUpperCase() })} onBlur={() => validateOnBlur("code", form.code)} error={errors.code} />
+        <Input label="Discount %" requiredMark inputMode="decimal" value={form.discount_value} onChange={(e) => patch({ discount_value: e.target.value })} onBlur={() => validateOnBlur("discount_value", form.discount_value)} error={errors.discount_value} />
+        <Input label="Min order ₹" inputMode="decimal" value={form.min_order_value} onChange={(e) => patch({ min_order_value: e.target.value })} onBlur={() => validateOnBlur("min_order_value", form.min_order_value)} error={errors.min_order_value} />
+        <Input label="Max cap ₹" inputMode="decimal" value={form.max_discount_cap} onChange={(e) => patch({ max_discount_cap: e.target.value })} onBlur={() => validateOnBlur("max_discount_cap", form.max_discount_cap)} error={errors.max_discount_cap} />
       </div>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-[200px_1fr]">

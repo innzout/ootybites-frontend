@@ -6,6 +6,12 @@ import type { StoreSettings } from "@/lib/endpoints";
 import { ApiException } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { Input } from "@/components/ui/Input";
+import { useFieldErrors } from "@/lib/useFieldErrors";
+import { optional, email, phoneIN } from "@/lib/validators";
+
+// Both optional - a store may not publish a support line - but must be real
+// once filled in, because they are shown to customers.
+const schema = { support_email: [optional(email)], support_phone: [optional(phoneIN)] };
 import { Spinner } from "@/components/ui/Spinner";
 import { FormShell } from "@/components/admin/FormShell";
 
@@ -21,13 +27,19 @@ export default function AdminSettingsPage() {
       .catch(() => setError("Could not load settings"));
   }, []);
 
+  const { errors, validateAll, revalidate, validateOnBlur } = useFieldErrors(schema);
+
   function set<K extends keyof StoreSettings>(key: K, value: StoreSettings[K]) {
     setForm((f) => (f ? { ...f, [key]: value } : f));
+    revalidate(key as string, value);
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!form) return;
+    // These two are printed on the storefront and in order emails, so a typo
+    // here is publicly visible.
+    if (!validateAll(form as unknown as Record<string, unknown>)) return;
     setSaving(true);
     setError(null);
     try {
@@ -67,8 +79,8 @@ export default function AdminSettingsPage() {
       </Section>
 
       <Section title="Contact">
-        <Input label="Support email" type="email" value={form.support_email} onChange={(e) => set("support_email", e.target.value)} placeholder="hello@example.com" />
-        <Input label="Support phone" value={form.support_phone} onChange={(e) => set("support_phone", e.target.value)} placeholder="+91…" />
+        <Input label="Support email" type="email" autoComplete="email" value={form.support_email} onChange={(e) => set("support_email", e.target.value)} onBlur={() => validateOnBlur("support_email", form.support_email)} error={errors.support_email} placeholder="hello@example.com" />
+        <Input label="Support phone" type="tel" inputMode="numeric" maxLength={10} value={form.support_phone} onChange={(e) => set("support_phone", e.target.value.replace(/\D/g, "").slice(0, 10))} onBlur={() => validateOnBlur("support_phone", form.support_phone)} error={errors.support_phone} placeholder="9876543210" />
         <div className="sm:col-span-2">
           <Input label="Store address" value={form.store_address} onChange={(e) => set("store_address", e.target.value)} />
         </div>

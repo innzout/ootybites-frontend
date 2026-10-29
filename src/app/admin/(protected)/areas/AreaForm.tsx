@@ -8,6 +8,14 @@ import { ApiException } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { Input } from "@/components/ui/Input";
 import { FormShell } from "@/components/admin/FormShell";
+import { useFieldErrors } from "@/lib/useFieldErrors";
+import { required, pincode, maxLength } from "@/lib/validators";
+
+const schema = {
+  code: [required, maxLength(10)],
+  name: [required, maxLength(120)],
+  pincode: [pincode],
+};
 
 export function AreaForm({ area }: { area?: Area }) {
   const router = useRouter();
@@ -19,6 +27,11 @@ export function AreaForm({ area }: { area?: Area }) {
     pincode: area?.pincode ?? "",
     hub_id: area?.hub_id ?? "",
   });
+  const { errors, validateAll, revalidatePatch, validateOnBlur } = useFieldErrors(schema);
+  function patch(p: Partial<typeof form>) {
+    setForm((f) => ({ ...f, ...p }));
+    revalidatePatch(p as Record<string, unknown>);
+  }
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -29,6 +42,7 @@ export function AreaForm({ area }: { area?: Area }) {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!validateAll(form)) return;
     setSaving(true);
     try {
       const body = {
@@ -66,9 +80,9 @@ export function AreaForm({ area }: { area?: Area }) {
       error={error}
     >
       <div className="grid gap-4 sm:grid-cols-2">
-        <Input label="Code" placeholder="SIR" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} />
-        <Input label="Area name" placeholder="Siruseri" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-        <Input label="Pincode" placeholder="603103" value={form.pincode} onChange={(e) => setForm({ ...form, pincode: e.target.value })} />
+        <Input label="Code" requiredMark placeholder="SIR" value={form.code} onChange={(e) => patch({ code: e.target.value.toUpperCase() })} onBlur={() => validateOnBlur("code", form.code)} error={errors.code} />
+        <Input label="Area name" requiredMark placeholder="Siruseri" value={form.name} onChange={(e) => patch({ name: e.target.value })} onBlur={() => validateOnBlur("name", form.name)} error={errors.name} />
+        <Input label="Pincode" requiredMark inputMode="numeric" maxLength={6} placeholder="603103" value={form.pincode} onChange={(e) => patch({ pincode: e.target.value.replace(/\D/g, "").slice(0, 6) })} onBlur={() => validateOnBlur("pincode", form.pincode)} error={errors.pincode} />
         <label className="flex flex-col gap-1">
           <span className="text-sm font-medium text-ink">Hub</span>
           <select

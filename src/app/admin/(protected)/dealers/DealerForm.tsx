@@ -8,6 +8,17 @@ import { ApiException } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { Input } from "@/components/ui/Input";
 import { FormShell } from "@/components/admin/FormShell";
+import { useFieldErrors } from "@/lib/useFieldErrors";
+import { required, phoneIN, minLength, maxLength } from "@/lib/validators";
+
+// Password is validated conditionally in submit: required when creating,
+// optional when editing (blank keeps the existing one).
+const schema = {
+  name: [required, maxLength(120)],
+  mobile: [phoneIN],
+  address: [maxLength(300)],
+  username: [required, minLength(3), maxLength(60)],
+};
 
 const crumbs = (label: string) => [
   { label: "Dealers", href: "/admin/dealers" },
@@ -25,6 +36,11 @@ export function DealerForm({ dealer }: { dealer?: Dealer }) {
     username: dealer?.username ?? "",
     password: "",
   });
+  const { errors, validateAll, revalidatePatch, validateOnBlur, setServerErrors } = useFieldErrors(schema);
+  function patch(p: Partial<typeof form>) {
+    setForm((f) => ({ ...f, ...p }));
+    revalidatePatch(p as Record<string, unknown>);
+  }
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -33,6 +49,16 @@ export function DealerForm({ dealer }: { dealer?: Dealer }) {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!validateAll(form)) return;
+    // A new dealer must get a password; editing may leave it blank to keep it.
+    if (!editing && form.password.trim().length < 8) {
+      setServerErrors({ password: "Set a password of at least 8 characters" });
+      return;
+    }
+    if (editing && form.password.trim() !== "" && form.password.trim().length < 8) {
+      setServerErrors({ password: "Must be at least 8 characters" });
+      return;
+    }
     setSaving(true);
     try {
       if (editing) {
@@ -68,17 +94,19 @@ export function DealerForm({ dealer }: { dealer?: Dealer }) {
       error={error}
     >
       <div className="grid gap-4 sm:grid-cols-2">
-        <Input label="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-        <Input label="Mobile" value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value })} />
+        <Input label="Name" requiredMark value={form.name} onChange={(e) => patch({ name: e.target.value })} onBlur={() => validateOnBlur("name", form.name)} error={errors.name} />
+        <Input label="Mobile" requiredMark type="tel" inputMode="numeric" maxLength={10} value={form.mobile} onChange={(e) => patch({ mobile: e.target.value.replace(/\D/g, "").slice(0, 10) })} onBlur={() => validateOnBlur("mobile", form.mobile)} error={errors.mobile} />
         <div className="sm:col-span-2">
-          <Input label="Address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+          <Input label="Address" value={form.address} onChange={(e) => patch({ address: e.target.value })} onBlur={() => validateOnBlur("address", form.address)} error={errors.address} />
         </div>
-        <Input label="Username (login)" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
+        <Input label="Username (login)" requiredMark autoComplete="off" value={form.username} onChange={(e) => patch({ username: e.target.value })} onBlur={() => validateOnBlur("username", form.username)} error={errors.username} />
         <Input
           label={editing ? "New password (leave blank to keep)" : "Password"}
           type="password"
           value={form.password}
-          onChange={(e) => setForm({ ...form, password: e.target.value })}
+          autoComplete="new-password"
+          onChange={(e) => patch({ password: e.target.value })}
+          error={errors.password}
         />
       </div>
     </FormShell>

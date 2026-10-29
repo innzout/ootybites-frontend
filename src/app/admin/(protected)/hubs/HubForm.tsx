@@ -8,6 +8,10 @@ import { ApiException } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { Input } from "@/components/ui/Input";
 import { FormShell } from "@/components/admin/FormShell";
+import { useFieldErrors } from "@/lib/useFieldErrors";
+import { required, maxLength } from "@/lib/validators";
+
+const schema = { name: [required, maxLength(120)] };
 
 export function HubForm({ hub }: { hub?: Hub }) {
   const router = useRouter();
@@ -15,6 +19,7 @@ export function HubForm({ hub }: { hub?: Hub }) {
   const [dealers, setDealers] = useState<Dealer[]>([]);
   const [name, setName] = useState(hub?.name ?? "");
   const [dealerId, setDealerId] = useState(hub?.dealer_id ?? "");
+  const { errors, validateAll, revalidate, validateOnBlur } = useFieldErrors(schema);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -25,6 +30,7 @@ export function HubForm({ hub }: { hub?: Hub }) {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!validateAll({ name })) return;
     setSaving(true);
     try {
       if (editing) {
@@ -54,7 +60,7 @@ export function HubForm({ hub }: { hub?: Hub }) {
       error={error}
     >
       <div className="grid gap-4 sm:grid-cols-2">
-        <Input label="Hub name" placeholder="Siruseri Hub" value={name} onChange={(e) => setName(e.target.value)} />
+        <Input label="Hub name" requiredMark placeholder="Siruseri Hub" value={name} onChange={(e) => { setName(e.target.value); revalidate("name", e.target.value); }} onBlur={() => validateOnBlur("name", name)} error={errors.name} />
         <label className="flex flex-col gap-1">
           <span className="text-sm font-medium text-ink">Dealer</span>
           <select className="h-10 rounded-xl border border-line bg-white px-3 text-sm" value={dealerId} onChange={(e) => setDealerId(e.target.value)}>

@@ -24,6 +24,7 @@ const nav = [
   { href: "/admin/vendors", label: "Vendors" },
   { href: "/admin/banners", label: "Banners" },
   { href: "/admin/coupons", label: "Coupons" },
+  { href: "/admin/reviews", label: "Reviews" },
   { href: "/admin/pages", label: "Content" },
   { href: "/admin/league", label: "Game league" },
   { href: "/admin/admins", label: "Admins", superAdminOnly: true },

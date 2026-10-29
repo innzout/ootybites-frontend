@@ -6,6 +6,7 @@ import { adminCreateAdmin, adminUpdateAdmin, type AdminUser, type AdminRole } fr
 import { ApiException } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { Input } from "@/components/ui/Input";
+import { useClearableErrors } from "@/lib/useFieldErrors";
 import { FormShell } from "@/components/admin/FormShell";
 
 const crumbs = (label: string) => [{ label: "Admins", href: "/admin/admins" }, { label }];
@@ -26,7 +27,7 @@ export function AdminUserForm({ admin }: { admin?: AdminUser }) {
     password: "",
     role: (admin?.role ?? "manager") as AdminRole,
   });
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const { errors, setErrors, clearField } = useClearableErrors();
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -79,7 +80,7 @@ export function AdminUserForm({ admin }: { admin?: AdminUser }) {
           label="Username (login)"
           requiredMark
           value={form.username}
-          onChange={(e) => setForm({ ...form, username: e.target.value })}
+          onChange={(e) => { setForm({ ...form, username: e.target.value }); clearField("username"); }}
           error={errors.username}
         />
         <Input label="Display name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
@@ -88,7 +89,7 @@ export function AdminUserForm({ admin }: { admin?: AdminUser }) {
           requiredMark={!editing}
           type="password"
           value={form.password}
-          onChange={(e) => setForm({ ...form, password: e.target.value })}
+          onChange={(e) => { setForm({ ...form, password: e.target.value }); clearField("password"); }}
           error={errors.password}
           placeholder="At least 8 characters"
         />

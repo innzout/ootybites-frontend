@@ -8,6 +8,15 @@ import { ApiException } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { Input } from "@/components/ui/Input";
 import { FormShell } from "@/components/admin/FormShell";
+import { useFieldErrors } from "@/lib/useFieldErrors";
+import { required, optional, linkTarget, nonNegativeNumber, maxLength } from "@/lib/validators";
+
+const schema = {
+  image: [required],
+  title: [maxLength(120)],
+  link: [optional(linkTarget)],
+  sort: [nonNegativeNumber],
+};
 import { ImageUpload } from "@/components/admin/ImageUpload";
 
 export function BannerForm({ banner }: { banner?: Banner }) {
@@ -20,6 +29,11 @@ export function BannerForm({ banner }: { banner?: Banner }) {
     link: banner?.link_url ?? "",
     sort: banner ? String(banner.sort_order) : "0",
   });
+  const { errors, validateAll, revalidatePatch, validateOnBlur } = useFieldErrors(schema);
+  function patch(p: Partial<typeof form>) {
+    setForm((f) => ({ ...f, ...p }));
+    revalidatePatch(p as Record<string, unknown>);
+  }
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -31,6 +45,7 @@ export function BannerForm({ banner }: { banner?: Banner }) {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!validateAll(form)) return;
     setSaving(true);
     try {
       const body = {
@@ -68,8 +83,8 @@ export function BannerForm({ banner }: { banner?: Banner }) {
     >
       <div className="flex flex-col gap-4">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Input label="Image URL" placeholder="Upload below, or paste a URL" value={form.image} onChange={(e) => setForm({ ...form, image: e.target.value })} />
-          <Input label="Title (optional caption)" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+          <Input label="Image URL" requiredMark placeholder="Upload below, or paste a URL" value={form.image} onChange={(e) => patch({ image: e.target.value })} onBlur={() => validateOnBlur("image", form.image)} error={errors.image} />
+          <Input label="Title (optional caption)" value={form.title} onChange={(e) => patch({ title: e.target.value })} onBlur={() => validateOnBlur("title", form.title)} error={errors.title} />
         </div>
         <ImageUpload folder="ootybites/banners" onUploaded={(url) => setForm((f) => ({ ...f, image: url }))} label={editing ? "Replace image" : "Upload banner image"} />
 
@@ -87,11 +102,11 @@ export function BannerForm({ banner }: { banner?: Banner }) {
               ))}
             </select>
           </label>
-          <Input label="Link URL (or custom)" placeholder="/products/ooty-tea or https://…" value={form.link} onChange={(e) => setForm({ ...form, link: e.target.value })} />
+          <Input label="Link URL (or custom)" placeholder="/products/ooty-tea or https://…" value={form.link} onChange={(e) => patch({ link: e.target.value })} onBlur={() => validateOnBlur("link", form.link)} error={errors.link} />
         </div>
 
         <div className="w-28">
-          <Input label="Sort order" value={form.sort} onChange={(e) => setForm({ ...form, sort: e.target.value })} />
+          <Input label="Sort order" inputMode="numeric" value={form.sort} onChange={(e) => patch({ sort: e.target.value })} onBlur={() => validateOnBlur("sort", form.sort)} error={errors.sort} />
         </div>
 
         {form.image && (

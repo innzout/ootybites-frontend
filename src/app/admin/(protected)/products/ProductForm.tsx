@@ -8,6 +8,7 @@ import type { Category } from "@/lib/endpoints";
 import { ApiException } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { Input } from "@/components/ui/Input";
+import { useClearableErrors } from "@/lib/useFieldErrors";
 import { FormShell } from "@/components/admin/FormShell";
 import { ImageUpload } from "@/components/admin/ImageUpload";
 
@@ -36,7 +37,7 @@ export function ProductForm() {
   const [categoryId, setCategoryId] = useState("");
   const [categories, setCategories] = useState<Category[]>([]);
   const [variants, setVariants] = useState<VForm[]>([{ ...emptyVariant }]);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const { errors, setErrors, clearField } = useClearableErrors();
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -45,6 +46,8 @@ export function ProductForm() {
 
   function setVariant(i: number, patch: Partial<VForm>) {
     setVariants((vs) => vs.map((v, idx) => (idx === i ? { ...v, ...patch } : v)));
+    // The variants error covers the whole block, so any edit inside it clears.
+    clearField("variants");
   }
   function addVariant() {
     setVariants((vs) => [...vs, { ...emptyVariant }]);
@@ -111,7 +114,7 @@ export function ProductForm() {
     >
       <div className="flex flex-col gap-5">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Input label="Name *" value={name} onChange={(e) => setName(e.target.value)} error={errors.name} />
+          <Input label="Name *" value={name} onChange={(e) => { setName(e.target.value); clearField("name"); }} error={errors.name} />
           <Input label="Description" value={desc} onChange={(e) => setDesc(e.target.value)} />
         </div>
         {name && <p className="-mt-2 text-xs text-muted">slug: {slugify(name)}</p>}
@@ -147,12 +150,12 @@ export function ProductForm() {
               )}
             </div>
             <div className="flex flex-col gap-2">
-              <ImageUpload folder="ootybites/products" label="Upload image" onUploaded={setImage} />
+              <ImageUpload folder="ootybites/products" label="Upload image" onUploaded={(u) => { setImage(u); clearField("image"); }} />
               <input
                 className="h-9 w-64 max-w-full rounded-lg border border-line px-2 text-sm"
                 placeholder="…or paste an image URL"
                 value={image}
-                onChange={(e) => setImage(e.target.value)}
+                onChange={(e) => { setImage(e.target.value); clearField("image"); }}
               />
             </div>
           </div>

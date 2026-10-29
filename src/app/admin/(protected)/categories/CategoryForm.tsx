@@ -7,6 +7,7 @@ import type { Category } from "@/lib/endpoints";
 import { ApiException } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { Input } from "@/components/ui/Input";
+import { useClearableErrors } from "@/lib/useFieldErrors";
 import { FormShell } from "@/components/admin/FormShell";
 
 const crumbs = (label: string) => [{ label: "Categories", href: "/admin/categories" }, { label }];
@@ -22,7 +23,7 @@ export function CategoryForm({ category }: { category?: Category }) {
     sort_order: category ? String(category.sort_order) : "0",
     is_active: category?.is_active ?? true,
   });
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const { errors, setErrors, clearField } = useClearableErrors();
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -67,12 +68,12 @@ export function CategoryForm({ category }: { category?: Category }) {
       maxWidth="max-w-xl"
     >
       <div className="grid gap-4 sm:grid-cols-2">
-        <Input label="Name" requiredMark value={form.name} onChange={(e) => setName(e.target.value)} error={errors.name} />
+        <Input label="Name" requiredMark value={form.name} onChange={(e) => { setName(e.target.value); clearField("name"); }} error={errors.name} />
         <Input
           label="Slug"
           requiredMark
           value={form.slug}
-          onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") })}
+          onChange={(e) => { setForm({ ...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") }); clearField("slug"); }}
           error={errors.slug}
           placeholder="teas"
         />

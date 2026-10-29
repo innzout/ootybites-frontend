@@ -8,7 +8,9 @@ export function GridActions({
   onDelete,
   toggle,
 }: {
-  onEdit: () => void;
+  // Optional: some rows have nothing to edit (a customer review is moderated
+  // by deleting it, never by rewriting it under their name).
+  onEdit?: () => void;
   onDelete: () => void;
   toggle?: { label: string; onClick: () => void };
 }) {
@@ -22,12 +24,14 @@ export function GridActions({
           {toggle.label}
         </button>
       )}
-      <button
-        onClick={onEdit}
-        className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700 hover:bg-brand-100"
-      >
-        <Pencil className="h-3 w-3" /> Edit
-      </button>
+      {onEdit && (
+        <button
+          onClick={onEdit}
+          className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700 hover:bg-brand-100"
+        >
+          <Pencil className="h-3 w-3" /> Edit
+        </button>
+      )}
       <button onClick={onDelete} className="text-xs font-semibold text-red-600 hover:underline">
         Delete
       </button>
