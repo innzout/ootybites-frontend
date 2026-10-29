@@ -53,15 +53,18 @@ export function NilgiriHero({ firstName }: { firstName?: string }) {
           id="hero-heading"
           className="mt-2 max-w-2xl font-display text-[1.75rem] font-extrabold leading-[1.08] text-white sm:text-4xl lg:text-5xl"
         >
-          Grown in the Nilgiris,
+          Baked in Nilgiris,
           <br />
           packed the week you order.
         </h1>
 
+        {/* Snacks lead the copy. "Grown in the Nilgiris" over a hills photo read
+            as tourism rather than a food shop, so the line that follows names
+            what we bake before what we grow. */}
         <p className="mt-3 max-w-md text-sm text-cream/90 sm:text-base">
           {firstName
-            ? `Good to see you, ${firstName}. Tea, honey, oils and varki — straight from the hills.`
-            : "Tea, honey, cold-pressed oils and small-batch varki — straight from the hills to your door."}
+            ? `Good to see you, ${firstName}. Varki, snacks, chocolates and tea — straight from the hills.`
+            : "Small-batch varki, home-style snacks and Ooty chocolates — with tea, honey and cold-pressed oils from the hills."}
         </p>
 
         <a

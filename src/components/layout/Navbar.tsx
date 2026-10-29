@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ShoppingBag, User, Heart, Gamepad2 } from "lucide-react";
 import { useCartStore } from "@/store/cartStore";
 import { useWishlistStore } from "@/store/wishlistStore";
@@ -46,6 +46,22 @@ export function Navbar() {
   const link = `rounded-full px-3 py-2 text-muted transition-colors hover:bg-brand-50 hover:text-brand-700 ${focusRing}`;
   const icon = `rounded-full p-2 text-muted transition-colors hover:bg-brand-50 hover:text-brand-700 ${focusRing}`;
 
+  // Persistent "you are here" styling.
+  //
+  // The bar previously had hover states only, so the green pill a customer saw
+  // on the section they were in was just :hover - it vanished the moment the
+  // pointer left, leaving no indication of the current page. The active pill
+  // below is driven by the route, so it stays put.
+  const pathname = usePathname();
+  // "/" would otherwise prefix-match every route, so it is matched exactly.
+  const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
+  const activePill = "bg-brand-50 text-brand-700";
+  // aria-current tells a screen reader the same thing the pill tells the eye.
+  const navProps = (href: string) =>
+    ({ className: cn(link, isActive(href) && activePill), "aria-current": isActive(href) ? ("page" as const) : undefined });
+  const iconProps = (href: string, extra?: string) =>
+    ({ className: cn(icon, extra, isActive(href) && activePill), "aria-current": isActive(href) ? ("page" as const) : undefined });
+
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-white/90 backdrop-blur-md">
       <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
@@ -57,16 +73,16 @@ export function Navbar() {
           <BrandMark />
         </Link>
         <div className="flex items-center gap-0.5 text-sm font-semibold sm:gap-1.5">
-          <Link href="/" className={cn(link, "hidden sm:block")}>
+          <Link href="/" {...navProps("/")} className={cn(navProps("/").className, "hidden sm:block")}>
             Shop
           </Link>
-          <Link href="/orders" className={cn(link, "hidden sm:block")}>
+          <Link href="/orders" {...navProps("/orders")} className={cn(navProps("/orders").className, "hidden sm:block")}>
             Orders
           </Link>
-          <Link href="/play" className={icon} aria-label="Play Ooty Bites Dash">
+          <Link href="/play" {...iconProps("/play")} aria-label="Play Ooty Bites Dash">
             <Gamepad2 className="h-5 w-5" />
           </Link>
-          <Link href="/wishlist" className={cn(icon, "relative")} aria-label="Wishlist">
+          <Link href="/wishlist" {...iconProps("/wishlist", "relative")} aria-label="Wishlist">
             <Heart className="h-5 w-5" />
             {wishBadge > 0 && (
               <span className="absolute right-0 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-500 px-1 text-[10px] font-bold text-white">
@@ -74,7 +90,7 @@ export function Navbar() {
               </span>
             )}
           </Link>
-          <Link href="/cart" className={cn(icon, "relative")} aria-label="Cart">
+          <Link href="/cart" {...iconProps("/cart", "relative")} aria-label="Cart">
             <ShoppingBag className="h-5 w-5" />
             {cartBadge > 0 && (
               <span className="absolute right-0 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-500 px-1 text-[10px] font-bold text-white">
@@ -85,7 +101,7 @@ export function Navbar() {
           {isAuthed ? (
             <>
               <NotificationBell fetchFeed={listNotifications} markRead={markNotificationsRead} tone="dark" hrefFor={(n) => (n.order_id ? `/orders/${n.order_id}` : null)} />
-              <Link href="/account" className={icon} aria-label="Account">
+              <Link href="/account" {...iconProps("/account")} aria-label="Account">
                 <User className="h-5 w-5" />
               </Link>
               <button onClick={signOut} className={cn(link, "hidden sm:block")}>

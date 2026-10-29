@@ -16,14 +16,14 @@ import {
 import { ApiException } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuthStore } from "@/store/authStore";
-import { validateFields, required, phoneIN, pincode } from "@/lib/validators";
+import { useFieldErrors } from "@/lib/useFieldErrors";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/ui/Modal";
 import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
-import { AddressFields, emptyAddress, DEFAULT_STATE } from "@/components/shop/AddressFields";
+import { AddressFields, emptyAddress, DEFAULT_STATE, addressSchema } from "@/components/shop/AddressFields";
 
 const emptyAddr = { ...emptyAddress };
 
@@ -45,7 +45,7 @@ export default function AccountPage() {
   const [form, setForm] = useState(emptyAddr);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingDefault, setEditingDefault] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const { errors, validateAll, revalidatePatch, validateOnBlur, reset: resetErrors } = useFieldErrors(addressSchema);
   const [savingAddr, setSavingAddr] = useState(false);
 
   // If a request reports the session is gone, sign out cleanly.
@@ -88,28 +88,31 @@ export default function AccountPage() {
     }
   }
 
+  // Patch the form and re-check only the fields that changed, so a corrected
+  // value clears its own error straight away rather than at the next submit.
+  function patchForm(patch: Partial<typeof emptyAddr>) {
+    setForm((f) => ({ ...f, ...patch }));
+    revalidatePatch(patch as Record<string, unknown>);
+  }
+
   function openAdd() {
     setEditingId(null);
     setEditingDefault(false);
     setForm(emptyAddr);
-    setErrors({});
+    resetErrors();
     setShowForm(true);
   }
   function openEdit(a: Address) {
     setEditingId(a.id);
     setEditingDefault(a.is_default);
     setForm({ name: a.name, phone: a.phone, line1: a.line1, line2: a.line2 ?? "", city: a.city, state: a.state, pincode: a.pincode, lat: a.lat, lng: a.lng });
-    setErrors({});
+    resetErrors();
     setShowForm(true);
   }
 
   async function saveAddress(e: React.FormEvent) {
     e.preventDefault();
-    const errs = validateFields(form as unknown as Record<string, string>, {
-      name: [required], phone: [phoneIN], line1: [required], city: [required], state: [required], pincode: [pincode],
-    });
-    setErrors(errs);
-    if (Object.keys(errs).length > 0) return;
+    if (!validateAll(form as unknown as Record<string, unknown>)) return;
     setSavingAddr(true);
     const input: AddressInput = { ...form, state: form.state || DEFAULT_STATE, is_default: editingId ? editingDefault : addresses.length === 0 };
     try {
@@ -276,7 +279,7 @@ export default function AccountPage() {
                 if (el?.closest(".ob-place-autocomplete")) e.preventDefault();
               }}
             >
-              <AddressFields value={form} set={(patch) => setForm((f) => ({ ...f, ...patch }))} errors={errors} />
+              <AddressFields value={form} set={patchForm} errors={errors} onBlurField={validateOnBlur} />
             </form>
           </Modal>
         </div>

@@ -13,7 +13,7 @@ import {
   type ShippingInput,
 } from "@/lib/endpoints";
 import type { Address } from "@/types";
-import { validateFields, required, phoneIN, pincode } from "@/lib/validators";
+import { useFieldErrors } from "@/lib/useFieldErrors";
 import { ApiException } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { askConfirm } from "@/lib/confirm";
@@ -22,7 +22,7 @@ import Link from "next/link";
 import { buttonClasses } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { useHydrated } from "@/lib/useHydrated";
-import { AddressFields, DEFAULT_STATE } from "@/components/shop/AddressFields";
+import { AddressFields, DEFAULT_STATE, addressSchema } from "@/components/shop/AddressFields";
 import { AddressBook } from "@/components/checkout/AddressBook";
 import { OrderSummary } from "@/components/checkout/OrderSummary";
 import type { ExpressResult } from "@/components/checkout/DeliveryMethod";
@@ -69,7 +69,8 @@ export default function CheckoutPage() {
 
   const [ship, setShip] = useState<ShippingInput>(emptyShipping);
   const [deliveryNote, setDeliveryNote] = useState("");
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const { errors, validateAll, revalidatePatch, validateOnBlur, setServerErrors, reset: resetErrors } =
+    useFieldErrors(addressSchema);
   const [code, setCode] = useState("");
   const [discount, setDiscount] = useState(0);
   const [couponMsg, setCouponMsg] = useState<string | null>(null);
@@ -127,17 +128,25 @@ export default function CheckoutPage() {
     setCouponMsg(null);
   }, [items]);
 
+  // Patch the shipping address and re-check just the fields that changed, so a
+  // correction clears its own error immediately instead of lingering until the
+  // next submit.
+  function patchShip(patch: Partial<ShippingInput>) {
+    setShip((s) => ({ ...s, ...patch }));
+    revalidatePatch(patch as Record<string, unknown>);
+  }
+
   function pickSaved(a: Address) {
     setSelectedId(a.id);
     setShip(toShipping(a));
     setMode("saved");
-    setErrors({});
+    resetErrors();
   }
   function newAddress() {
     setSelectedId(null);
     setShip(emptyShipping);
     setMode("new");
-    setErrors({});
+    resetErrors();
   }
 
   async function applyCoupon() {
@@ -160,16 +169,7 @@ export default function CheckoutPage() {
 
   async function submit() {
     setError(null);
-    const errs = validateFields(ship as unknown as Record<string, string>, {
-      name: [required],
-      phone: [phoneIN],
-      line1: [required],
-      city: [required],
-      state: [required],
-      pincode: [pincode],
-    });
-    setErrors(errs);
-    if (Object.keys(errs).length > 0) return;
+    if (!validateAll(ship as unknown as Record<string, unknown>)) return;
 
     // Placing an order is a commitment (COD, dispatched from Ooty) and is one of
     // the actions the project rules require a confirmation for.
@@ -206,7 +206,7 @@ export default function CheckoutPage() {
         for (const [k, v] of Object.entries(ex.fields)) {
           mapped[k.startsWith("shipping.") ? k.slice("shipping.".length) : k] = v;
         }
-        setErrors(mapped);
+        setServerErrors(mapped);
       }
     } finally {
       setPlacing(false);
@@ -266,7 +266,7 @@ export default function CheckoutPage() {
         {/* Address form — for a new address, or when the book is empty. */}
         {(mode === "new" || addresses.length === 0) && (
           <div className="rounded-2xl border border-line bg-white p-4">
-            <AddressFields value={ship} set={(patch) => setShip((s) => ({ ...s, ...patch }))} errors={errors} />
+            <AddressFields value={ship} set={patchShip} errors={errors} onBlurField={validateOnBlur} />
             <label className="mt-3 flex items-center gap-2 text-sm text-muted">
               <input type="checkbox" checked={saveNew} onChange={(e) => setSaveNew(e.target.checked)} />
               Save this address for next time

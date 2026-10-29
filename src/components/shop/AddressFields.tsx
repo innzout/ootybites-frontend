@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { listCities } from "@/lib/endpoints";
 import { Input } from "@/components/ui/Input";
+import { required, phoneIN, pincode } from "@/lib/validators";
 import { MapPicker, type PickedLocation } from "@/components/shop/MapPicker";
 
 // The shared delivery-address value shape used by both the account page and
@@ -20,6 +21,18 @@ export interface AddressValue {
 }
 
 export const DEFAULT_STATE = "Tamil Nadu";
+
+// The one validation schema for a delivery address, shared by checkout and the
+// account address book so the two can never disagree about what is valid.
+// Module-level so its identity is stable for useFieldErrors' memoisation.
+export const addressSchema = {
+  name: [required],
+  phone: [phoneIN],
+  line1: [required],
+  city: [required],
+  state: [required],
+  pincode: [pincode],
+};
 
 // A fresh address with the state pre-filled to the state we sell in.
 export const emptyAddress: AddressValue = {
@@ -40,11 +53,16 @@ export function AddressFields({
   value,
   set,
   errors = {},
+  onBlurField,
 }: {
   value: AddressValue;
   set: (patch: Partial<AddressValue>) => void;
   errors?: Record<string, string>;
+  // Validate a single field when the customer leaves it, so a mistake surfaces
+  // before they reach the submit button.
+  onBlurField?: (field: string, value: unknown) => void;
 }) {
+  const blur = (field: keyof AddressValue) => () => onBlurField?.(field, value[field]);
   const [cities, setCities] = useState<string[]>([]);
   const [areaNote, setAreaNote] = useState<string | null>(null);
 
@@ -134,13 +152,51 @@ export function AddressFields({
       )}
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Input label="Full name" requiredMark value={value.name} onChange={(e) => set({ name: e.target.value })} error={errors.name} />
-        <Input label="Phone" requiredMark value={value.phone} onChange={(e) => set({ phone: e.target.value })} error={errors.phone} />
+        {/* autoComplete is not a nicety here: without it the browser guesses
+            what each field is and its own saved-info overlay competes with the
+            field for focus while you type. Naming them lets the browser fill
+            the address in one go instead. */}
+        <Input
+          label="Full name"
+          requiredMark
+          autoComplete="name"
+          value={value.name}
+          onChange={(e) => set({ name: e.target.value })}
+          onBlur={blur("name")}
+          error={errors.name}
+        />
+        <Input
+          label="Phone"
+          requiredMark
+          type="tel"
+          autoComplete="tel"
+          inputMode="numeric"
+          maxLength={10}
+          value={value.phone}
+          // Digits only, capped at 10. Letters silently did nothing useful and
+          // a pasted "+91 " prefix pushed the number past the length check.
+          onChange={(e) => set({ phone: e.target.value.replace(/\D/g, "").slice(0, 10) })}
+          onBlur={blur("phone")}
+          error={errors.phone}
+        />
         <div className="sm:col-span-2">
-          <Input label="Address line 1" requiredMark value={value.line1} onChange={(e) => set({ line1: e.target.value })} error={errors.line1} />
+          <Input
+            label="Address line 1"
+            requiredMark
+            autoComplete="address-line1"
+            value={value.line1}
+            onChange={(e) => set({ line1: e.target.value })}
+            onBlur={blur("line1")}
+            error={errors.line1}
+          />
         </div>
         <div className="sm:col-span-2">
-          <Input label="Address line 2 (optional)" value={value.line2 ?? ""} onChange={(e) => set({ line2: e.target.value })} />
+          <Input
+            label="Address line 2 (optional)"
+            autoComplete="address-line2"
+            value={value.line2 ?? ""}
+            onChange={(e) => set({ line2: e.target.value })}
+          />
         </div>
 
         {/* City — constrained to serviceable cities from admin Areas. */}
@@ -151,7 +207,9 @@ export function AddressFields({
           {cities.length > 0 ? (
             <select
               value={value.city}
+              autoComplete="address-level2"
               onChange={(e) => set({ city: e.target.value })}
+              onBlur={blur("city")}
               aria-invalid={!!errors.city}
               className={`h-10 rounded-xl border bg-white px-3 text-sm text-ink outline-none transition-colors focus:border-brand-500 focus:ring-2 focus:ring-brand-500/25 ${
                 errors.city ? "border-red-500" : "border-line"
@@ -166,15 +224,45 @@ export function AddressFields({
             </select>
           ) : (
             // No serviceable cities configured yet → fall back to free text.
-            <Input value={value.city} onChange={(e) => set({ city: e.target.value })} error={errors.city} />
+            <Input
+              autoComplete="address-level2"
+              value={value.city}
+              onChange={(e) => set({ city: e.target.value })}
+              onBlur={blur("city")}
+              error={errors.city}
+            />
           )}
-          {errors.city && <span className="text-xs text-red-600">{errors.city}</span>}
+          {/* Only the select branch needs this: the Input branch renders its own
+              error, and showing both printed the message twice. */}
+          {cities.length > 0 && errors.city && (
+            <span role="alert" className="text-xs text-red-600">
+              {errors.city}
+            </span>
+          )}
         </label>
 
         {/* State — fixed to where we deliver. */}
-        <Input label="State" requiredMark value={value.state || DEFAULT_STATE} readOnly className="bg-surface" error={errors.state} />
+        <Input
+          label="State"
+          requiredMark
+          autoComplete="address-level1"
+          value={value.state || DEFAULT_STATE}
+          readOnly
+          className="bg-surface"
+          error={errors.state}
+        />
 
-        <Input label="Pincode" requiredMark value={value.pincode} onChange={(e) => set({ pincode: e.target.value })} error={errors.pincode} />
+        <Input
+          label="Pincode"
+          requiredMark
+          autoComplete="postal-code"
+          inputMode="numeric"
+          maxLength={6}
+          value={value.pincode}
+          onChange={(e) => set({ pincode: e.target.value.replace(/\D/g, "").slice(0, 6) })}
+          onBlur={blur("pincode")}
+          error={errors.pincode}
+        />
       </div>
     </div>
   );
