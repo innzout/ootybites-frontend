@@ -307,3 +307,20 @@ export const adminOpenSeason = (name: string, prize: string) =>
   adminApi.post<{ season: AdminSeason }>("/admin/game/seasons", { name, prize });
 export const adminCloseSeason = () =>
   adminApi.post<{ season: AdminSeason }>("/admin/game/seasons/close");
+
+// ---------------- Reviews (moderation) ----------------
+export interface AdminReview {
+  id: string;
+  product_id: string;
+  customer_id: string;
+  rating: number;
+  body: string;
+  created_at: string;
+  updated_at: string;
+  customer_name?: string;
+  customer_phone?: string;
+  product_name?: string;
+  product_slug?: string;
+}
+export const adminListReviews = () => adminApi.get<{ reviews: AdminReview[] }>("/admin/reviews");
+export const adminDeleteReview = (id: string) => adminApi.del<{ deleted: boolean }>(`/admin/reviews/${id}`);

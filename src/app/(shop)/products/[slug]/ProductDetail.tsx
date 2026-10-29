@@ -10,6 +10,7 @@ import { useCartStore } from "@/store/cartStore";
 import { useWishlistStore } from "@/store/wishlistStore";
 import { useRecentStore } from "@/store/recentStore";
 import { Button } from "@/components/ui/Button";
+import { ProductReviews } from "@/components/product/ProductReviews";
 import { RemoteImage } from "@/components/ui/RemoteImage";
 import { cn } from "@/lib/cn";
 
@@ -66,7 +67,8 @@ export function ProductDetail({ product }: { product: Product }) {
   }
 
   return (
-    <div className="grid gap-8 md:grid-cols-2">
+    <>
+      <div className="grid gap-8 md:grid-cols-2">
       <div>
         <div className="relative aspect-square overflow-hidden rounded-2xl bg-brand-50 shadow-product">
           {/* The PDP hero is the LCP element — the one image on the site that
@@ -173,7 +175,13 @@ export function ProductDetail({ product }: { product: Product }) {
             Go to cart →
           </button>
         )}
+        </div>
       </div>
-    </div>
+
+      {/* Signed-in-only: shows a sign-in prompt to logged-out visitors rather
+          than review content, which is why this page emits no public
+          AggregateRating structured data. */}
+      <ProductReviews productId={product.id} />
+    </>
   );
 }

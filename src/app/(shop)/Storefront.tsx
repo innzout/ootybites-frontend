@@ -23,6 +23,9 @@ const FEATURES = [
 ];
 
 const SORTS: { value: NonNullable<ProductQuery["sort"]>; label: string }[] = [
+  // Default. Follows the category order set in admin, so the shop leads with
+  // snacks rather than with whatever was added most recently.
+  { value: "featured", label: "Featured" },
   { value: "newest", label: "Newest" },
   { value: "price_asc", label: "Price: low to high" },
   { value: "price_desc", label: "Price: high to low" },
@@ -52,7 +55,7 @@ export function Storefront({
   const [search, setSearch] = useState(searchParams.get("q") ?? "");
   const [q, setQ] = useState(searchParams.get("q") ?? "");
   const [category, setCategory] = useState("");
-  const [sort, setSort] = useState<NonNullable<ProductQuery["sort"]>>("newest");
+  const [sort, setSort] = useState<NonNullable<ProductQuery["sort"]>>("featured");
 
   // Results — seeded from the server so the first paint has products in the HTML.
   const [products, setProducts] = useState<Product[]>(initialProducts);
@@ -62,7 +65,7 @@ export function Storefront({
 
   // Skip the very first client fetch when the initial filters match the server
   // defaults (we already have that data). A ?q= on load counts as a real query.
-  const seeded = useRef(q === "" && category === "" && sort === "newest");
+  const seeded = useRef(q === "" && category === "" && sort === "featured");
 
   // Keep the search box in sync if the navbar routes here with ?q=.
   useEffect(() => {

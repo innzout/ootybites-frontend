@@ -71,7 +71,10 @@ export const listCategories = () => api.get<{ categories: Category[] }>("/catego
 export interface ProductQuery {
   q?: string;
   category?: string; // category id
-  sort?: "newest" | "price_asc" | "price_desc" | "name";
+  sort?: "featured" | "newest" | "price_asc" | "price_desc" | "name";
+  // Restrict to specific products. Serialises to a comma-separated list, which
+  // is what the API expects; used by the wishlist to refresh price and stock.
+  ids?: string[];
   page?: number;
   limit?: number;
 }
@@ -203,3 +206,38 @@ export interface GameSeason {
   starts_at: string;
 }
 export const getGameSeason = () => api.get<{ season: GameSeason | null }>("/game/season");
+
+// ---------------- Reviews ----------------
+//
+// Signed-in only. There is no anonymous read endpoint, so these calls are made
+// solely from authenticated screens; a logged-out visitor is shown a prompt to
+// sign in rather than an empty review list.
+export interface Review {
+  id: string;
+  product_id: string;
+  customer_id: string;
+  rating: number;
+  body: string;
+  created_at: string;
+  updated_at: string;
+  customer_name?: string;
+}
+
+export interface ProductReviews {
+  reviews: Review[];
+  average: number;
+  count: number;
+  // Whether the signed-in customer has a delivered order containing this
+  // product, which is what earns the right to review it.
+  can_review: boolean;
+  // Their existing review, when they have already left one.
+  mine: Review | null;
+}
+
+export const listProductReviews = (productId: string) =>
+  api.get<ProductReviews>(`/reviews?product_id=${encodeURIComponent(productId)}`, true);
+
+export const saveReview = (productId: string, rating: number, body: string) =>
+  api.post<Review>("/reviews", { product_id: productId, rating, body }, true);
+
+export const deleteReview = (id: string) => api.del<{ deleted: boolean }>(`/reviews/${id}`, true);

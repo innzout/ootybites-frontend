@@ -1,19 +1,58 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Heart, X } from "lucide-react";
+import { Heart } from "lucide-react";
 import { useWishlistStore } from "@/store/wishlistStore";
-import { formatPrice } from "@/lib/format";
+import { listProducts } from "@/lib/endpoints";
+import type { Product } from "@/types";
 import { buttonClasses } from "@/components/ui/Button";
-import { RemoteImage } from "@/components/ui/RemoteImage";
+import { ProductCard } from "@/components/product/ProductCard";
+import { ProductCardSkeleton } from "@/components/ui/Skeleton";
 import { Spinner } from "@/components/ui/Spinner";
 import { useHydrated } from "@/lib/useHydrated";
 
 export default function WishlistPage() {
   const items = useWishlistStore((s) => s.items);
-  const remove = useWishlistStore((s) => s.remove);
   // Persisted in localStorage — same server/client mismatch as the cart.
   const hydrated = useHydrated(useWishlistStore);
+
+  // The wishlist only stores a snapshot (name, price, image) taken when the item
+  // was saved, which can be months stale: it has no stock, so a sold-out product
+  // sat in here looking perfectly buyable while the same product was greyed out
+  // everywhere else. Re-fetch the live products and render the ordinary
+  // ProductCard, so the sold-out treatment, pricing and quick view are by
+  // definition identical to the rest of the shop.
+  const [products, setProducts] = useState<Product[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const ids = items.map((i) => i.id).join(",");
+
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!ids) {
+      setProducts([]);
+      return;
+    }
+    let live = true;
+    setFailed(false);
+    listProducts({ ids: ids.split(","), limit: 100 })
+      .then((d) => live && setProducts(d.products ?? []))
+      .catch(() => {
+        if (!live) return;
+        setProducts([]);
+        setFailed(true);
+      });
+    return () => {
+      live = false;
+    };
+  }, [hydrated, ids]);
+
+  // Keep the saved order rather than the API's, so the grid does not reshuffle.
+  const ordered = products
+    ? items.map((i) => products.find((p) => p.id === i.id)).filter((p): p is Product => !!p)
+    : [];
+  // A saved product that no longer comes back is unpublished or deleted.
+  const missing = products ? items.length - ordered.length : 0;
 
   return (
     <div>
@@ -34,37 +73,32 @@ export default function WishlistPage() {
             Browse products
           </Link>
         </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5 lg:grid-cols-4">
-          {items.map((it) => (
-            <div key={it.id} className="group relative flex flex-col overflow-hidden rounded-2xl border border-line bg-white shadow-product">
-              <button
-                type="button"
-                aria-label="Remove"
-                onClick={() => remove(it.id)}
-                className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-white/85 text-muted shadow-sm backdrop-blur hover:text-ink"
-              >
-                <X className="h-4 w-4" />
-              </button>
-              <Link href={`/products/${it.slug}`} className="flex flex-1 flex-col">
-                <div className="relative aspect-square overflow-hidden bg-brand-50">
-                  <RemoteImage
-                    src={it.imageUrl}
-                    alt={it.name}
-                    sizes="(min-width: 1024px) 288px, (min-width: 640px) 33vw, 50vw"
-                    className="transition-transform duration-500 group-hover:scale-105"
-                  />
-                </div>
-                <div className="flex flex-1 flex-col gap-1 p-3">
-                  <h3 className="line-clamp-1 font-serif text-lg text-ink">{it.name}</h3>
-                  {it.price !== null && (
-                    <span className="mt-auto font-display text-lg font-semibold text-brand-700">{formatPrice(it.price)}</span>
-                  )}
-                </div>
-              </Link>
-            </div>
+      ) : products === null ? (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5 lg:grid-cols-4" aria-busy="true">
+          {items.map((i) => (
+            <ProductCardSkeleton key={i.id} />
           ))}
         </div>
+      ) : (
+        <>
+          {failed && (
+            <p className="mb-4 rounded-xl bg-surface px-3 py-2 text-sm text-muted" role="alert">
+              Could not refresh your saved items just now. Please try again.
+            </p>
+          )}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5 lg:grid-cols-4">
+            {ordered.map((p) => (
+              <ProductCard key={p.id} product={p} />
+            ))}
+          </div>
+          {!failed && missing > 0 && (
+            <p className="mt-4 text-sm text-muted">
+              {missing === 1
+                ? "1 saved item is no longer available and is not shown."
+                : `${missing} saved items are no longer available and are not shown.`}
+            </p>
+          )}
+        </>
       )}
     </div>
   );

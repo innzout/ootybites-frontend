@@ -26,7 +26,7 @@ export const metadata: Metadata = {
 // Storefront for search/sort/filter. Emits Organization + WebSite JSON-LD.
 export default async function HomePage() {
   const [prod, cats, ban] = await Promise.all([
-    listProducts({ sort: "newest", page: 1, limit: 12 }).catch(() => ({ products: [], total: 0 })),
+    listProducts({ sort: "featured", page: 1, limit: 12 }).catch(() => ({ products: [], total: 0 })),
     listCategories().catch(() => ({ categories: [] })),
     listBanners().catch(() => ({ banners: [] })),
   ]);
