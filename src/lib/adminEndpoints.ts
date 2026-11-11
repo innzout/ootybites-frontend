@@ -210,6 +210,8 @@ export interface HubInput {
   name: string;
   dealer_id?: string | null;
   is_active: boolean;
+  lat?: number | null;
+  lng?: number | null;
 }
 export const adminListHubs = () => adminApi.get<{ hubs: Hub[] }>("/admin/hubs");
 export const adminGetHub = (id: string) => adminApi.get<Hub>(`/admin/hubs/${id}`);
@@ -324,3 +326,36 @@ export interface AdminReview {
 }
 export const adminListReviews = () => adminApi.get<{ reviews: AdminReview[] }>("/admin/reviews");
 export const adminDeleteReview = (id: string) => adminApi.del<{ deleted: boolean }>(`/admin/reviews/${id}`);
+
+// ---------------- Orders map ----------------
+//
+// Lightweight pins for the map view. Separate from the paginated order list:
+// a map needs every order in the filtered range at once, with far fewer fields.
+export interface OrderMapPoint {
+  id: string;
+  order_number: string;
+  status: OrderStatus;
+  placed_at: string;
+  total: number;
+  is_express: boolean;
+  ship_name: string;
+  ship_phone: string;
+  ship_line1: string;
+  ship_city: string;
+  ship_pincode: string;
+  ship_lat: number;
+  ship_lng: number;
+  // The hub the order dispatches from — the route origin. Null when the order
+  // has no hub, or the hub has not been pinned on the map yet.
+  hub_id: string | null;
+  hub_name: string | null;
+  hub_lat: number | null;
+  hub_lng: number | null;
+}
+
+export const adminOrdersMap = (p: { status?: string; from?: string; to?: string } = {}) => {
+  const q = new URLSearchParams();
+  Object.entries(p).forEach(([k, v]) => v && q.set(k, v));
+  const qs = q.toString();
+  return adminApi.get<{ points: OrderMapPoint[] }>(`/admin/orders/map${qs ? `?${qs}` : ""}`);
+};

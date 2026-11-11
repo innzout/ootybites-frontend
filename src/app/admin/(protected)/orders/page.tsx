@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import Link from "next/link";
+import { Map as MapIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { ICellRendererParams } from "@/components/admin/gridHelpers";
 import type { Order, OrderStatus } from "@/types";
@@ -85,7 +86,19 @@ export default function AdminOrdersPage() {
 
   return (
     <div>
-      <PageHeader title="Orders" subtitle={`${grid.total} order${grid.total === 1 ? "" : "s"} total`} breadcrumbs={[{ label: "Orders" }]} />
+      <PageHeader
+        title="Orders"
+        subtitle={`${grid.total} order${grid.total === 1 ? "" : "s"} total`}
+        breadcrumbs={[{ label: "Orders" }]}
+        action={
+          <Link
+            href="/admin/orders/map"
+            className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-2 text-sm font-semibold text-ink hover:border-brand-400 hover:text-brand-600"
+          >
+            <MapIcon className="h-4 w-4" /> Map view
+          </Link>
+        }
+      />
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         {statuses.map((s) => (

@@ -1,7 +1,8 @@
 "use client";
 
-import { MapPin, ExternalLink } from "lucide-react";
+import { MapPin, ExternalLink, Navigation } from "lucide-react";
 import { useMapsConfig } from "@/components/shop/MapsConfig";
+import { directionsUrl, latLngParam } from "@/lib/googleMaps";
 
 
 // OrderLocationMap shows the customer's delivery pin for an order: an embedded
@@ -11,6 +12,9 @@ export function OrderLocationMap({ lat, lng, label }: { lat?: number | null; lng
   const { apiKey: KEY } = useMapsConfig();
   if (lat == null || lng == null) return null;
   const gmaps = `https://www.google.com/maps?q=${lat},${lng}`;
+  // Origin is the rider's own location: this single-order view does not load
+  // the hub's coordinates. The orders map, which does, routes from the hub.
+  const route = directionsUrl("My+Location", latLngParam(lat, lng));
 
   return (
     <div className="mt-3">
@@ -45,9 +49,19 @@ export function OrderLocationMap({ lat, lng, label }: { lat?: number | null; lng
           View delivery location on Google Maps →
         </a>
       )}
-      <p className="mt-1 text-[11px] text-muted">
-        {lat.toFixed(6)}, {lng.toFixed(6)}
-      </p>
+      <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[11px] text-muted">
+          {lat.toFixed(6)}, {lng.toFixed(6)}
+        </p>
+        <a
+          href={route}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1.5 rounded-full bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700"
+        >
+          <Navigation className="h-3.5 w-3.5" /> Directions
+        </a>
+      </div>
     </div>
   );
 }

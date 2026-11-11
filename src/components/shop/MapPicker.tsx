@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { MapPin, LocateFixed, AlertTriangle } from "lucide-react";
 import { useMapsConfig } from "@/components/shop/MapsConfig";
+import { loadMaps } from "@/lib/googleMaps";
 import { cn } from "@/lib/cn";
 
 // MapPicker is a Google-Maps location picker for the delivery address. It is
@@ -45,28 +46,6 @@ function toLatLng(v: any): { lat: number; lng: number } {
   return typeof v?.lat === "function"
     ? { lat: v.lat(), lng: v.lng() }
     : { lat: Number(v?.lat), lng: Number(v?.lng) };
-}
-
-let loaderPromise: Promise<void> | null = null;
-function loadMaps(KEY: string): Promise<void> {
-  if (typeof window === "undefined") return Promise.reject(new Error("no window"));
-  if ((window as any).google?.maps) return Promise.resolve();
-  if (loaderPromise) return loaderPromise;
-  loaderPromise = new Promise<void>((resolve, reject) => {
-    const s = document.createElement("script");
-    // NOT loading=async. That flag requires Google's inline bootstrap snippet;
-    // with a plain <script src> the onload fires before google.maps.importLibrary
-    // exists, so everything throws. The console logs a performance hint about
-    // this — accepted deliberately. The classic bootstrap still exposes
-    // importLibrary(), which is all the newer libraries below need.
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${KEY}&libraries=places`;
-    s.async = true;
-    s.defer = true;
-    s.onload = () => resolve();
-    s.onerror = () => reject(new Error("Google Maps failed to load"));
-    document.head.appendChild(s);
-  });
-  return loaderPromise;
 }
 
 export interface PickedLocation {

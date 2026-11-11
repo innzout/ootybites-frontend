@@ -171,6 +171,10 @@ export interface Hub {
   dealer_name?: string | null;
   is_active: boolean;
   area_count: number;
+  // Map pin. Null until an admin places it; the orders map needs it as the
+  // origin for a delivery route.
+  lat?: number | null;
+  lng?: number | null;
   created_at: string;
 }
 

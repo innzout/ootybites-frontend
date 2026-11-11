@@ -8,6 +8,7 @@ import { ApiException } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { Input } from "@/components/ui/Input";
 import { FormShell } from "@/components/admin/FormShell";
+import { MapPicker } from "@/components/shop/MapPicker";
 import { useFieldErrors } from "@/lib/useFieldErrors";
 import { required, maxLength } from "@/lib/validators";
 
@@ -19,6 +20,11 @@ export function HubForm({ hub }: { hub?: Hub }) {
   const [dealers, setDealers] = useState<Dealer[]>([]);
   const [name, setName] = useState(hub?.name ?? "");
   const [dealerId, setDealerId] = useState(hub?.dealer_id ?? "");
+  // The hub pin is the origin of every delivery route drawn on the orders map,
+  // so without it those orders can only offer "start from my location".
+  const [pin, setPin] = useState<{ lat: number; lng: number } | null>(
+    hub?.lat != null && hub?.lng != null ? { lat: hub.lat, lng: hub.lng } : null,
+  );
   const { errors, validateAll, revalidate, validateOnBlur } = useFieldErrors(schema);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -34,10 +40,22 @@ export function HubForm({ hub }: { hub?: Hub }) {
     setSaving(true);
     try {
       if (editing) {
-        await adminUpdateHub(hub.id, { name, dealer_id: dealerId || null, is_active: hub.is_active });
+        await adminUpdateHub(hub.id, {
+          name,
+          dealer_id: dealerId || null,
+          is_active: hub.is_active,
+          lat: pin?.lat ?? null,
+          lng: pin?.lng ?? null,
+        });
         toast.success("Hub updated");
       } else {
-        await adminCreateHub({ name, dealer_id: dealerId || null, is_active: true });
+        await adminCreateHub({
+          name,
+          dealer_id: dealerId || null,
+          is_active: true,
+          lat: pin?.lat ?? null,
+          lng: pin?.lng ?? null,
+        });
         toast.success("Hub created");
       }
       router.push("/admin/hubs");
@@ -70,6 +88,23 @@ export function HubForm({ hub }: { hub?: Hub }) {
             ))}
           </select>
         </label>
+      </div>
+
+      <div className="mt-5">
+        <p className="text-sm font-medium text-ink">
+          Hub location <span className="font-normal text-muted">(optional)</span>
+        </p>
+        <p className="mb-2 text-xs text-muted">
+          Drop a pin where this hub dispatches from. The orders map draws each delivery route
+          starting here; without it those orders can only offer directions from the rider&rsquo;s own
+          location.
+        </p>
+        <MapPicker onPick={(loc) => setPin({ lat: loc.lat, lng: loc.lng })} initial={pin ?? undefined} />
+        {pin && (
+          <p className="mt-1.5 text-xs font-medium text-brand-600">
+            ð Pinned at {pin.lat.toFixed(6)}, {pin.lng.toFixed(6)}
+          </p>
+        )}
       </div>
     </FormShell>
   );
