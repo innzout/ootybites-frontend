@@ -104,7 +104,7 @@ export default function AdminReviewsPage() {
     col<AdminReview>("body", "Comment", {
       minWidth: 240,
       cellRenderer: (p: ICellRendererParams<AdminReview>) => (
-        <span className="text-muted">{(p.value as string) || "—"}</span>
+        <span className="line-clamp-2 break-words text-muted">{(p.value as string) || "—"}</span>
       ),
     }),
     actionCol<AdminReview>("", (r) => <GridActions onDelete={() => remove(r)} />, {

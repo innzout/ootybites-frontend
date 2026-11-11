@@ -263,7 +263,9 @@ export function ProductReviews({ productId }: { productId: string }) {
                     )}
                     <span className="ml-auto text-xs text-muted">{formatDate(r.created_at)}</span>
                   </div>
-                  {r.body && <p className="mt-2 whitespace-pre-line text-sm text-ink">{r.body}</p>}
+                  {r.body && (
+                    <p className="mt-2 whitespace-pre-line break-words text-sm text-ink">{r.body}</p>
+                  )}
                 </article>
               ))
             )}

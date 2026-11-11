@@ -63,13 +63,21 @@ export default function LoginPage() {
         <h1 className="text-lg font-semibold text-neutral-800">Sign in</h1>
         <Input
           label="Mobile number"
+          type="tel"
           inputMode="numeric"
+          autoComplete="tel"
+          maxLength={10}
           placeholder="10-digit number"
           value={phone}
-          onChange={(e) => setPhone(e.target.value)}
+          // Digits only: letters never belonged here, and a pasted "+91 "
+          // prefix pushed the number past the 10-digit check.
+          onChange={(e) => {
+            setPhone(e.target.value.replace(/\D/g, "").slice(0, 10));
+            setError(null);
+          }}
           error={error}
         />
-        <Button type="submit" loading={busy}>
+        <Button type="submit" loading={busy} disabled={phone.length !== 10}>
           Send OTP
         </Button>
       </form>
@@ -88,12 +96,18 @@ export default function LoginPage() {
       <Input
         label="6-digit code"
         inputMode="numeric"
+        // Lets a phone offer the SMS code straight from the notification.
+        autoComplete="one-time-code"
+        maxLength={6}
         placeholder="••••••"
         value={code}
-        onChange={(e) => setCode(e.target.value)}
+        onChange={(e) => {
+          setCode(e.target.value.replace(/\D/g, "").slice(0, 6));
+          setError(null);
+        }}
         error={error}
       />
-      <Button type="submit" loading={busy}>
+      <Button type="submit" loading={busy} disabled={code.length !== 6}>
         Verify &amp; continue
       </Button>
       <button

@@ -44,7 +44,7 @@ export function Navbar() {
 
   const focusRing = "focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40";
   const link = `rounded-full px-3 py-2 text-muted transition-colors hover:bg-brand-50 hover:text-brand-700 ${focusRing}`;
-  const icon = `rounded-full p-2 text-muted transition-colors hover:bg-brand-50 hover:text-brand-700 ${focusRing}`;
+  const icon = `rounded-full p-1.5 sm:p-2 text-muted transition-colors hover:bg-brand-50 hover:text-brand-700 ${focusRing}`;
 
   // Persistent "you are here" styling.
   //
@@ -64,15 +64,17 @@ export function Navbar() {
 
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-white/90 backdrop-blur-md">
-      <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
+      <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-3 sm:px-4">
         <Link
           href="/"
           aria-label="Ootybites — home"
-          className={cn("rounded-xl", focusRing)}
+          // The mark is a fixed-size <Image>; scale it down below sm so the bar
+          // fits a 320px phone.
+          className={cn("shrink-0 rounded-xl [&_img]:h-9 [&_img]:w-auto sm:[&_img]:h-[46px]", focusRing)}
         >
           <BrandMark />
         </Link>
-        <div className="flex items-center gap-0.5 text-sm font-semibold sm:gap-1.5">
+        <div className="flex min-w-0 items-center gap-0.5 text-sm font-semibold sm:gap-1.5">
           <Link href="/" {...navProps("/")} className={cn(navProps("/").className, "hidden sm:block")}>
             Shop
           </Link>
@@ -111,7 +113,7 @@ export function Navbar() {
           ) : (
             <Link
               href="/login"
-              className="ml-1 rounded-full bg-accent-500 px-4 py-2 font-semibold text-white shadow-sm transition-transform hover:-translate-y-px hover:bg-accent-600"
+              className="ml-0.5 shrink-0 whitespace-nowrap rounded-full bg-accent-500 px-3 py-1.5 font-semibold text-white shadow-sm transition-transform hover:-translate-y-px hover:bg-accent-600 sm:ml-1 sm:px-4 sm:py-2"
             >
               Sign in
             </Link>

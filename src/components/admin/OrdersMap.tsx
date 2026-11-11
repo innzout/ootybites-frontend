@@ -231,8 +231,8 @@ export function OrdersMap({ points, loading }: { points: OrderMapPoint[]; loadin
             )}
           </div>
 
-          <p className="mt-1 text-sm font-semibold text-ink">{selected.ship_name}</p>
-          <p className="text-sm text-muted">
+          <p className="mt-1 break-words text-sm font-semibold text-ink">{selected.ship_name}</p>
+          <p className="break-words text-sm text-muted">
             {selected.ship_line1}, {selected.ship_city} - {selected.ship_pincode}
           </p>
           <p className="mt-1 text-xs text-muted">
