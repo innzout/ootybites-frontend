@@ -48,7 +48,10 @@ export default function LoginPage() {
       login(res.token, res.customer);
       // Return to where the user was headed (?next=/…), else home.
       const n = new URLSearchParams(window.location.search).get("next");
-      const dest = n && n.startsWith("/") && !n.startsWith("//") ? n : "/";
+      // Same-site paths only. "//host" is a protocol-relative URL, and browsers
+      // read "/host" the same way, so both would send a freshly signed-in
+      // customer to someone else's site.
+      const dest = n && n.startsWith("/") && !n.startsWith("//") && !n.includes("\\") ? n : "/";
       router.push(dest);
     } catch (ex) {
       setError(ex instanceof ApiException ? ex.message : "Could not verify code");
