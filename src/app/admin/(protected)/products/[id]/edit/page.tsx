@@ -22,6 +22,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { Badge } from "@/components/ui/Badge";
 import { ImageUpload } from "@/components/admin/ImageUpload";
 import { Breadcrumbs } from "@/components/admin/Breadcrumbs";
+import { runAdminAction } from "@/lib/adminAction";
 
 const UNITS = ["mg", "g", "kg", "ml", "l", "nos", "packets"];
 
@@ -183,23 +184,23 @@ function VariantEditor({
   }
   async function remove() {
     if (!(await askConfirm({ title: "Delete variant?", message: variant.label, tone: "danger", confirmText: "Delete" }))) return;
-    await adminDeleteVariant(variant.id);
-    onDeleted();
+    const ok = await runAdminAction(() => adminDeleteVariant(variant.id));
+    if (ok) onDeleted();
   }
 
   return (
     <Card className="p-3">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-6">
-        <input className="rounded-lg border border-line px-2 py-1.5 text-sm" placeholder="Label" value={f.label} onChange={(e) => setF({ ...f, label: e.target.value })} />
+        <input className="rounded-lg border border-line px-2 py-1.5 text-sm" placeholder="Label" aria-label="Variant label" maxLength={60} value={f.label} onChange={(e) => setF({ ...f, label: e.target.value })} />
         <select className="rounded-lg border border-line px-2 py-1.5 text-sm" value={f.unit} onChange={(e) => setF({ ...f, unit: e.target.value })}>
           {UNITS.map((u) => (
             <option key={u}>{u}</option>
           ))}
         </select>
-        <input className="rounded-lg border border-line px-2 py-1.5 text-sm" placeholder="Unit val" value={f.unit_value} onChange={(e) => setF({ ...f, unit_value: e.target.value })} />
-        <input className="rounded-lg border border-line px-2 py-1.5 text-sm" placeholder="MRP" value={f.mrp} onChange={(e) => setF({ ...f, mrp: e.target.value })} />
-        <input className="rounded-lg border border-line px-2 py-1.5 text-sm" placeholder="Price" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} />
-        <input className="rounded-lg border border-line px-2 py-1.5 text-sm" placeholder="Stock" value={f.stock_qty} onChange={(e) => setF({ ...f, stock_qty: e.target.value })} />
+        <input className="rounded-lg border border-line px-2 py-1.5 text-sm" placeholder="Unit val" aria-label="Unit value" inputMode="decimal" maxLength={8} value={f.unit_value} onChange={(e) => setF({ ...f, unit_value: e.target.value.replace(/[^d.]/g, "") })} />
+        <input className="rounded-lg border border-line px-2 py-1.5 text-sm" placeholder="MRP" aria-label="MRP in rupees" inputMode="decimal" maxLength={10} value={f.mrp} onChange={(e) => setF({ ...f, mrp: e.target.value.replace(/[^d.]/g, "") })} />
+        <input className="rounded-lg border border-line px-2 py-1.5 text-sm" placeholder="Price" aria-label="Selling price in rupees" inputMode="decimal" maxLength={10} value={f.price} onChange={(e) => setF({ ...f, price: e.target.value.replace(/[^d.]/g, "") })} />
+        <input className="rounded-lg border border-line px-2 py-1.5 text-sm" placeholder="Stock" aria-label="Stock quantity" inputMode="numeric" maxLength={6} value={f.stock_qty} onChange={(e) => setF({ ...f, stock_qty: e.target.value.replace(/D/g, "") })} />
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-sm text-muted">
@@ -243,16 +244,16 @@ function NewVariant({ productId, onCreated }: { productId: string; onCreated: ()
     <Card className="border-dashed p-3">
       <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Add variant</p>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-6">
-        <input className="rounded-lg border border-line px-2 py-1.5 text-sm" placeholder="Label" value={f.label} onChange={(e) => setF({ ...f, label: e.target.value })} />
+        <input className="rounded-lg border border-line px-2 py-1.5 text-sm" placeholder="Label" aria-label="Variant label" maxLength={60} value={f.label} onChange={(e) => setF({ ...f, label: e.target.value })} />
         <select className="rounded-lg border border-line px-2 py-1.5 text-sm" value={f.unit} onChange={(e) => setF({ ...f, unit: e.target.value })}>
           {UNITS.map((u) => (
             <option key={u}>{u}</option>
           ))}
         </select>
-        <input className="rounded-lg border border-line px-2 py-1.5 text-sm" placeholder="Unit val" value={f.unit_value} onChange={(e) => setF({ ...f, unit_value: e.target.value })} />
-        <input className="rounded-lg border border-line px-2 py-1.5 text-sm" placeholder="MRP" value={f.mrp} onChange={(e) => setF({ ...f, mrp: e.target.value })} />
-        <input className="rounded-lg border border-line px-2 py-1.5 text-sm" placeholder="Price" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} />
-        <input className="rounded-lg border border-line px-2 py-1.5 text-sm" placeholder="Stock" value={f.stock_qty} onChange={(e) => setF({ ...f, stock_qty: e.target.value })} />
+        <input className="rounded-lg border border-line px-2 py-1.5 text-sm" placeholder="Unit val" aria-label="Unit value" inputMode="decimal" maxLength={8} value={f.unit_value} onChange={(e) => setF({ ...f, unit_value: e.target.value.replace(/[^d.]/g, "") })} />
+        <input className="rounded-lg border border-line px-2 py-1.5 text-sm" placeholder="MRP" aria-label="MRP in rupees" inputMode="decimal" maxLength={10} value={f.mrp} onChange={(e) => setF({ ...f, mrp: e.target.value.replace(/[^d.]/g, "") })} />
+        <input className="rounded-lg border border-line px-2 py-1.5 text-sm" placeholder="Price" aria-label="Selling price in rupees" inputMode="decimal" maxLength={10} value={f.price} onChange={(e) => setF({ ...f, price: e.target.value.replace(/[^d.]/g, "") })} />
+        <input className="rounded-lg border border-line px-2 py-1.5 text-sm" placeholder="Stock" aria-label="Stock quantity" inputMode="numeric" maxLength={6} value={f.stock_qty} onChange={(e) => setF({ ...f, stock_qty: e.target.value.replace(/D/g, "") })} />
       </div>
       <Button size="sm" variant="secondary" className="mt-2" onClick={add} loading={busy} disabled={!f.label || !f.price}>
         Add variant

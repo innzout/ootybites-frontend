@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useDealerAuthStore } from "@/store/dealerAuthStore";
 import { useHydrated } from "@/lib/useHydrated";
 import { Spinner } from "@/components/ui/Spinner";
+import { confirmLogout } from "@/lib/confirm";
 import { BrandMark } from "@/components/ui/BrandMark";
 
 export default function DealerLayout({ children }: { children: React.ReactNode }) {
@@ -45,7 +46,8 @@ export default function DealerLayout({ children }: { children: React.ReactNode }
           <div className="flex items-center gap-3 text-sm text-cream/80">
             {dealer && <span className="hidden sm:inline">{dealer.name}</span>}
             <button
-              onClick={() => {
+              onClick={async () => {
+                if (!(await confirmLogout())) return;
                 logout();
                 router.replace("/"); // back to the storefront home, not login
               }}

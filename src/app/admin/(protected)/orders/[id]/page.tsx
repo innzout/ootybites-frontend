@@ -12,6 +12,7 @@ import {
 } from "@/lib/adminEndpoints";
 import { ApiException } from "@/lib/api";
 import { toast } from "@/lib/toast";
+import { askConfirm } from "@/lib/confirm";
 import { formatPrice, formatDate } from "@/lib/format";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Spinner } from "@/components/ui/Spinner";
@@ -73,6 +74,20 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
   }
 
   async function changeStatus(status: OrderStatus, reason?: string) {
+    // Forward moves are confirmed here; cancel already has its own inline
+    // reason-and-confirm step. "Delivered" matters most: it cannot be undone,
+    // because an order can no longer be cancelled once delivered.
+    if (status !== "cancelled") {
+      const ok = await askConfirm({
+        title: `${statusLabel[status]}?`,
+        message:
+          status === "delivered"
+            ? `${order?.order_number ?? "This order"} will be closed. A delivered order cannot be cancelled afterwards.`
+            : `${order?.order_number ?? "This order"} will move to "${statusLabel[status]}" and the customer is notified.`,
+        confirmText: statusLabel[status],
+      });
+      if (!ok) return;
+    }
     setError(null);
     setBusy(true);
     try {

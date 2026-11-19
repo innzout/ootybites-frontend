@@ -8,6 +8,8 @@ import { useAuthStore } from "@/store/authStore";
 import { getGameHighScore, getGameSeason, startGameRun, submitGameScore, type GameSeason } from "@/lib/endpoints";
 import { Leaderboard } from "@/components/game/Leaderboard";
 import { Spinner } from "@/components/ui/Spinner";
+import { toast } from "@/lib/toast";
+import { ApiException } from "@/lib/api";
 
 // The canvas game is client-only (it touches window/canvas) — never SSR it.
 const RunnerGame = dynamic(() => import("@/components/game/RunnerGame").then((m) => m.RunnerGame), {
@@ -73,7 +75,13 @@ export default function PlayPage() {
       if (isAuthed) {
         const ticket = ticketRef.current;
         ticketRef.current = null; // one ticket per run
-        if (!ticket) return; // run was not opened server-side; nothing to record
+        // No ticket means the run was never opened server-side (usually a
+        // dropped connection at the start), so the score cannot count. Say so:
+        // with prizes on the league, a silently lost score is a real grievance.
+        if (!ticket) {
+          toast.error("This run wasn't recorded for the league — check your connection and play again.");
+          return;
+        }
         submitGameScore(score, ticket)
           .then((d) => {
             setHighScore(d.high_score ?? score);
@@ -81,7 +89,9 @@ export default function PlayPage() {
             return getGameHighScore();
           })
           .then((d) => setRank(d.rank || undefined))
-          .catch(() => {});
+          .catch((ex) => {
+            toast.error(ex instanceof ApiException ? ex.message : "Your score could not be saved. Please try again.");
+          });
       } else {
         const local = Number(localStorage.getItem(GUEST_KEY) || 0);
         if (score > local) {
@@ -130,7 +140,7 @@ export default function PlayPage() {
           <RunnerGame highScore={highScore} onStart={onStart} onSubmit={onSubmit} />
           {!isAuthed && (
             <p className="mt-4 text-center text-sm text-muted">
-              <Link href="/login" className="font-semibold text-brand-600 hover:underline">
+              <Link href="/login?next=/play" className="font-semibold text-brand-600 hover:underline">
                 Sign in
               </Link>{" "}
               to save your score and enter the league.

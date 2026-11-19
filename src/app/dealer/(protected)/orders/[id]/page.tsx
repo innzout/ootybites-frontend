@@ -6,6 +6,7 @@ import type { Order, OrderStatus } from "@/types";
 import { dealerGetOrder, dealerUpdateOrderStatus } from "@/lib/dealerEndpoints";
 import { ApiException } from "@/lib/api";
 import { toast } from "@/lib/toast";
+import { askConfirm } from "@/lib/confirm";
 import { formatPrice, formatDate } from "@/lib/format";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Card } from "@/components/ui/Card";
@@ -47,6 +48,17 @@ export default function DealerOrderDetailPage({ params }: { params: Promise<{ id
   }, [load]);
 
   async function advance(status: OrderStatus) {
+    // Confirmed because "delivered" closes the order for good, and a dealer is
+    // usually tapping this on a phone, often on the move.
+    const ok = await askConfirm({
+      title: `${label[status]}?`,
+      message:
+        status === "delivered"
+          ? `Only confirm once you have handed over ${order?.order_number ?? "the order"} and collected ${order ? formatPrice(order.total) : "payment"}. This cannot be undone.`
+          : `${order?.order_number ?? "This order"} will be updated and the customer notified.`,
+      confirmText: label[status],
+    });
+    if (!ok) return;
     setBusy(true);
     setError(null);
     try {

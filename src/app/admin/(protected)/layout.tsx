@@ -10,6 +10,7 @@ import { BrandMark } from "@/components/ui/BrandMark";
 import { NotificationBell } from "@/components/ui/NotificationBell";
 import { adminListNotifications, adminMarkNotificationsRead, adminMe } from "@/lib/adminEndpoints";
 import { cn } from "@/lib/cn";
+import { confirmLogout } from "@/lib/confirm";
 
 const nav = [
   { href: "/admin/dashboard", label: "Dashboard" },
@@ -76,7 +77,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   // Log out → clear session and return to the storefront home.
-  const signOut = () => {
+  const signOut = async () => {
+    if (!(await confirmLogout())) return;
     logout();
     router.replace("/");
   };

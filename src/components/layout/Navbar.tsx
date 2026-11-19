@@ -11,6 +11,7 @@ import { NotificationBell } from "@/components/ui/NotificationBell";
 import { listNotifications, markNotificationsRead } from "@/lib/endpoints";
 import { useHydrated } from "@/lib/useHydrated";
 import { cn } from "@/lib/cn";
+import { confirmLogout } from "@/lib/confirm";
 
 // Navbar — shop header on a light surface, so the full-colour Ootybites
 // wordmark can be used (the white knockout was only needed because the bar used
@@ -37,7 +38,8 @@ export function Navbar() {
   const logout = useAuthStore((s) => s.logout);
 
   // Log out → clear session and return to the home page.
-  function signOut() {
+  async function signOut() {
+    if (!(await confirmLogout())) return;
     logout();
     router.push("/");
   }
@@ -112,7 +114,9 @@ export function Navbar() {
             </>
           ) : (
             <Link
-              href="/login"
+              // Return to this page after signing in, rather than dropping the
+              // customer on the home page and losing their place.
+              href={pathname === "/" || pathname.startsWith("/login") ? "/login" : `/login?next=${encodeURIComponent(pathname)}`}
               className="ml-0.5 shrink-0 whitespace-nowrap rounded-full bg-accent-500 px-3 py-1.5 font-semibold text-white shadow-sm transition-transform hover:-translate-y-px hover:bg-accent-600 sm:ml-1 sm:px-4 sm:py-2"
             >
               Sign in

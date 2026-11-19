@@ -177,8 +177,8 @@ export default function HubManagePage({ params }: { params: Promise<{ id: string
               <option key={s.variant_id} value={s.variant_id}>{s.product_name} · {s.variant_label}</option>
             ))}
           </select>
-          <input className="rounded-lg border border-line px-2 py-2 text-sm" placeholder="Qty" value={qty} onChange={(e) => setQty(e.target.value)} />
-          <input className="rounded-lg border border-line px-2 py-2 text-sm" placeholder="Unit cost ₹" value={cost} onChange={(e) => setCost(e.target.value)} />
+          <input className="rounded-lg border border-line px-2 py-2 text-sm" placeholder="Qty" inputMode="numeric" maxLength={6} aria-label="Quantity" value={qty} onChange={(e) => setQty(e.target.value.replace(/D/g, ""))} />
+          <input className="rounded-lg border border-line px-2 py-2 text-sm" placeholder="Unit cost ₹" inputMode="decimal" maxLength={10} aria-label="Unit cost in rupees" value={cost} onChange={(e) => setCost(e.target.value.replace(/[^d.]/g, ""))} />
           <select className="rounded-lg border border-line px-2 py-2 text-sm" value={vendorId} onChange={(e) => setVendorId(e.target.value)}>
             <option value="">Vendor…</option>
             {vendors.map((v) => (

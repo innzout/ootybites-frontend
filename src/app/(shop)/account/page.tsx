@@ -1,5 +1,5 @@
 "use client";
-import { askConfirm } from "@/lib/confirm";
+import { askConfirm, confirmLogout } from "@/lib/confirm";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -41,6 +41,8 @@ export default function AccountPage() {
 
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [loadingAddr, setLoadingAddr] = useState(true);
+  // A failed load used to fall through to "No saved addresses yet".
+  const [addrError, setAddrError] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyAddr);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -64,9 +66,12 @@ export default function AccountPage() {
   }, [ready, isAuthed, router]);
 
   function loadAddresses() {
+    setAddrError(false);
     listAddresses()
       .then((d) => setAddresses(d.addresses ?? []))
-      .catch(handle401)
+      .catch((ex) => {
+        if (!handle401(ex)) setAddrError(true);
+      })
       .finally(() => setLoadingAddr(false));
   }
   useEffect(() => {
@@ -128,18 +133,30 @@ export default function AccountPage() {
     }
   }
 
+  // Both used `.catch(handle401)`, which swallowed every error that was not a
+  // 401 - so "Default delivery address set" was shown even when the save had
+  // failed, and a failed delete simply left the address in place with no word.
   async function makeDefault(a: Address) {
-    await updateAddress(a.id, {
-      name: a.name, phone: a.phone, line1: a.line1, line2: a.line2 ?? "",
-      city: a.city, state: a.state, pincode: a.pincode, is_default: true,
-    }).catch(handle401);
-    toast.success("Default delivery address set");
-    loadAddresses();
+    try {
+      await updateAddress(a.id, {
+        name: a.name, phone: a.phone, line1: a.line1, line2: a.line2 ?? "",
+        city: a.city, state: a.state, pincode: a.pincode, is_default: true,
+      });
+      toast.success("Default delivery address set");
+      loadAddresses();
+    } catch (ex) {
+      if (!handle401(ex)) toast.error(ex instanceof ApiException ? ex.message : "Could not update your default address");
+    }
   }
   async function removeAddress(id: string) {
     if (!(await askConfirm({ title: "Delete address?", tone: "danger", confirmText: "Delete" }))) return;
-    await deleteAddress(id).catch(handle401);
-    loadAddresses();
+    try {
+      await deleteAddress(id);
+      toast.success("Address deleted");
+      loadAddresses();
+    } catch (ex) {
+      if (!handle401(ex)) toast.error(ex instanceof ApiException ? ex.message : "Could not delete the address");
+    }
   }
 
   if (!ready || !isAuthed)
@@ -209,7 +226,21 @@ export default function AccountPage() {
         </div>
       ) : (
         <div className="mt-3 space-y-3">
-          {addresses.length === 0 && !showForm && (
+          {addrError && (
+            <Card role="alert" className="flex flex-col items-center gap-3 py-8 text-center text-sm text-muted">
+              Could not load your saved addresses.
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setLoadingAddr(true);
+                  loadAddresses();
+                }}
+              >
+                Try again
+              </Button>
+            </Card>
+          )}
+          {!addrError && addresses.length === 0 && !showForm && (
             <Card className="py-10 text-center text-sm text-muted">No saved addresses yet.</Card>
           )}
           {addresses.map((a) => (
@@ -286,7 +317,14 @@ export default function AccountPage() {
       )}
 
       <div className="mt-8">
-        <Button variant="outline" onClick={() => { logout(); router.push("/"); }}>
+        <Button
+          variant="outline"
+          onClick={async () => {
+            if (!(await confirmLogout())) return;
+            logout();
+            router.push("/");
+          }}
+        >
           Log out
         </Button>
       </div>

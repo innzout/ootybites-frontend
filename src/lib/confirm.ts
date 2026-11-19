@@ -35,3 +35,17 @@ export const useConfirmStore = create<ConfirmState>((set, get) => ({
 export function askConfirm(options: ConfirmOptions): Promise<boolean> {
   return useConfirmStore.getState().request(options);
 }
+
+/**
+ * Asks before signing out. Logout is one of the actions CLAUDE.md rule 6 says
+ * must be confirmed: a stray tap otherwise throws away the session, and for a
+ * customer mid-checkout the cart context along with it. Shared so the shop,
+ * admin and dealer bars all ask the same question.
+ */
+export function confirmLogout(): Promise<boolean> {
+  return askConfirm({
+    title: "Log out?",
+    message: "You will need to sign in again to continue.",
+    confirmText: "Log out",
+  });
+}

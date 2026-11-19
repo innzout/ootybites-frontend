@@ -29,17 +29,22 @@ export function useServerTable<T>(
   const [rows, setRows] = useState<T[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  // Set when the last fetch failed. Without it a failed request left the grid
+  // empty, which reads as "no orders" rather than "could not load orders".
+  const [error, setError] = useState(false);
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState<string | undefined>();
   const [order, setOrder] = useState<"asc" | "desc" | undefined>();
 
   const load = useCallback(() => {
     setLoading(true);
+    setError(false);
     fetcher({ page, limit, sort, order })
       .then((d) => {
         setRows(d.rows ?? []);
         setTotal(d.total ?? 0);
       })
+      .catch(() => setError(true))
       .finally(() => setLoading(false));
     // fetcher is expected to be stable/memoised by the caller.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -60,5 +65,5 @@ export function useServerTable<T>(
     setPage(1);
   }, []);
 
-  return { rows, total, loading, page, setPage, sort, order, onServerSort, limit, reload: load };
+  return { rows, total, loading, error, page, setPage, sort, order, onServerSort, limit, reload: load };
 }
