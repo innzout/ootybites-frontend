@@ -1,6 +1,5 @@
-import { unstable_cache } from "next/cache";
 import { Footer } from "./Footer";
-import { listCategories } from "@/lib/endpoints";
+import { getCachedCategories } from "@/lib/cachedCatalog";
 
 // The footer's category links need an API call, but they sit at the very bottom
 // of the page. Fetching them in the shop layout blocked the entire shell: a
@@ -13,14 +12,8 @@ import { listCategories } from "@/lib/endpoints";
 // and flush the shell immediately. The links still arrive in the streamed SSR
 // HTML, so they stay crawlable.
 //
-// Cached because categories change rarely and this runs on every storefront
-// page view. Admin edits appear within the revalidate window.
-const cachedCategories = unstable_cache(
-  async () => listCategories().then((d) => d.categories ?? []).catch(() => []),
-  ["shop-footer-categories"],
-  { revalidate: 300, tags: ["categories"] },
-);
-
+// The list itself comes from the shared cached loader (lib/cachedCatalog), so
+// the footer, home page and category pages all reuse one copy.
 export async function FooterCategories() {
-  return <Footer categories={await cachedCategories()} />;
+  return <Footer categories={await getCachedCategories()} />;
 }

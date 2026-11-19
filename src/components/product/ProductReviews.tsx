@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Star, Trash2 } from "lucide-react";
 import {
   listProductReviews,
@@ -70,6 +71,7 @@ function StarPicker({ value, onChange }: { value: number; onChange: (n: number) 
  * `can_review` so the form is shown only when it would succeed.
  */
 export function ProductReviews({ productId }: { productId: string }) {
+  const pathname = usePathname();
   const authHydrated = useHydrated(useAuthStore);
   const isAuthed = useAuthStore((s) => s.isAuthenticated()) && authHydrated;
 
@@ -141,10 +143,18 @@ export function ProductReviews({ productId }: { productId: string }) {
   }
 
   // Logged out — do not reveal review content or counts.
+  // Before the session is known (server render, and the first client paint)
+  // show the section's heading and a placeholder the same size as the sign-in
+  // prompt. A bare spinner here had no heading and a different height, so the
+  // page jumped for every visitor once the session resolved.
   if (!authHydrated) {
     return (
       <section className="mt-10 border-t border-line pt-6">
-        <div className="py-8 text-center" aria-busy="true">
+        <h2 className="font-display text-lg font-bold text-ink">Reviews</h2>
+        <div
+          className="mt-3 flex min-h-[8.5rem] items-center justify-center rounded-2xl border border-line bg-surface"
+          aria-busy="true"
+        >
           <Spinner />
         </div>
       </section>
@@ -155,9 +165,10 @@ export function ProductReviews({ productId }: { productId: string }) {
     return (
       <section className="mt-10 border-t border-line pt-6">
         <h2 className="font-display text-lg font-bold text-ink">Reviews</h2>
-        <div className="mt-3 rounded-2xl border border-line bg-surface px-4 py-8 text-center">
+        <div className="mt-3 flex min-h-[8.5rem] flex-col items-center justify-center rounded-2xl border border-line bg-surface px-4 py-6 text-center">
           <p className="text-sm text-muted">Sign in to read reviews from other customers.</p>
-          <Link href="/login" className={buttonClasses({}, "mt-4")}>
+          {/* Come back to this product afterwards rather than the home page. */}
+          <Link href={`/login?next=${encodeURIComponent(pathname)}`} className={buttonClasses({}, "mt-4")}>
             Sign in
           </Link>
         </div>

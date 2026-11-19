@@ -20,9 +20,6 @@ export const minLength =
   (v) =>
     v.trim().length >= n ? null : `Must be at least ${n} characters`;
 
-export const positiveNumber: Validator = (v) =>
-  Number(v) > 0 ? null : "Must be greater than zero";
-
 export const nonNegativeNumber: Validator = (v) =>
   v.trim() !== "" && Number.isFinite(Number(v)) && Number(v) >= 0
     ? null

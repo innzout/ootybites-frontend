@@ -55,3 +55,16 @@ export function directionsUrl(origin: string, destination: string): string {
 export function latLngParam(lat: number, lng: number): string {
   return `${lat},${lng}`;
 }
+
+/**
+ * Straight-line (great-circle) distance in kilometres. Mirrors the backend's
+ * services.HaversineKm. Used where road distance is unavailable - it is always
+ * shorter than the drive, so the UI labels it "straight line".
+ */
+export function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const rad = (d: number) => (d * Math.PI) / 180;
+  const dLat = rad(lat2 - lat1);
+  const dLng = rad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.min(1, Math.sqrt(a)));
+}

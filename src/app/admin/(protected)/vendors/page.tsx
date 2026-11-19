@@ -14,34 +14,43 @@ import { PageHeader } from "@/components/admin/PageHeader";
 import { DataGrid } from "@/components/admin/DataGrid";
 import { GridActions } from "@/components/admin/GridActions";
 import { col, actionCol } from "@/components/admin/gridHelpers";
+import { LoadError } from "@/components/admin/LoadError";
+import { runAdminAction } from "@/lib/adminAction";
 
 export default function AdminVendorsPage() {
   const router = useRouter();
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   function load() {
+    setLoadError(false);
     adminListVendors()
       .then((d) => setVendors(d.vendors ?? []))
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
   }
   useEffect(load, []);
 
   async function toggle(v: Vendor) {
-    await adminUpdateVendor(v.id, {
-      name: v.name,
-      phone: v.phone ?? null,
-      location: v.location,
-      notes: v.notes ?? null,
-      is_active: !v.is_active,
+    const ok = await runAdminAction(async () => {
+      await adminUpdateVendor(v.id, {
+        name: v.name,
+        phone: v.phone ?? null,
+        location: v.location,
+        notes: v.notes ?? null,
+        is_active: !v.is_active,
+      });
     });
-    load();
+    if (ok) load();
   }
 
   async function remove(id: string) {
     if (!(await askConfirm({ title: "Delete vendor?", tone: "danger", confirmText: "Delete" }))) return;
-    await adminDeleteVendor(id);
-    load();
+    const ok = await runAdminAction(async () => {
+      await adminDeleteVendor(id);
+    });
+    if (ok) load();
   }
 
   if (loading)
@@ -49,6 +58,16 @@ export default function AdminVendorsPage() {
       <div className="flex justify-center py-20">
         <Spinner />
       </div>
+    );
+  if (loadError)
+    return (
+      <LoadError
+        what="vendors"
+        onRetry={() => {
+          setLoading(true);
+          load();
+        }}
+      />
     );
 
   const columnDefs = [
@@ -95,6 +114,7 @@ export default function AdminVendorsPage() {
         rowData={vendors}
         columnDefs={columnDefs}
         getRowId={(v) => v.id}
+        searchable="Search vendors by name, phone or location"
         sortable
         pagination
         pageSize={10}

@@ -2,7 +2,8 @@ import { cache } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { listCategories, listProducts, type Category } from "@/lib/endpoints";
+import { listProducts, type Category } from "@/lib/endpoints";
+import { getCachedCategories } from "@/lib/cachedCatalog";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { SITE_URL, breadcrumbJsonLd, itemListJsonLd } from "@/lib/seo";
 import { CategoryBrowse } from "./CategoryBrowse";
@@ -12,17 +13,8 @@ export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 12;
 
-const loadCategories = cache(async (): Promise<Category[]> => {
-  try {
-    const d = await listCategories();
-    return d.categories ?? [];
-  } catch {
-    return [];
-  }
-});
-
 const findBySlug = cache(async (slug: string): Promise<Category | null> => {
-  const all = await loadCategories();
+  const all = await getCachedCategories();
   return all.find((c) => c.slug === slug) ?? null;
 });
 
@@ -68,7 +60,7 @@ export default async function CategoryPage({
   const cat = await findBySlug(slug);
   if (!cat) notFound();
 
-  const [first, categories] = await Promise.all([loadFirstPage(cat.id), loadCategories()]);
+  const [first, categories] = await Promise.all([loadFirstPage(cat.id), getCachedCategories()]);
   const products = first.products ?? [];
   const others = categories.filter((c) => c.slug !== cat.slug);
 

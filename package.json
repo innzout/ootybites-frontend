@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@googlemaps/markerclusterer": "^2.6.2",
     "clsx": "^2.1.1",
     "lucide-react": "^0.575.0",
     "next": "^15.3.3",

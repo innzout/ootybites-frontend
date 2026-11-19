@@ -148,6 +148,8 @@ export const adminDeleteCoupon = (id: string) =>
 
 // --- Orders ---
 export interface OrderListParams {
+  // Order number, customer name or phone.
+  q?: string;
   status?: string;
   month?: string;
   from?: string;
@@ -165,8 +167,6 @@ export const adminListOrders = (p: OrderListParams = {}) => {
 export const adminGetOrder = (id: string) => adminApi.get<Order>(`/admin/orders/${id}`);
 export const adminUpdateOrderStatus = (id: string, status: OrderStatus, note?: string) =>
   adminApi.patch<Order>(`/admin/orders/${id}/status`, { status, note: note ?? "" });
-export const adminUpdateOrderAddress = (id: string, shipping: ShippingInput) =>
-  adminApi.put<Order>(`/admin/orders/${id}/address`, shipping);
 export const adminAddOrderNote = (id: string, note: string) =>
   adminApi.post<Order>(`/admin/orders/${id}/note`, { note });
 export const adminAssignOrder = (id: string, dealerId: string | null) =>
@@ -247,20 +247,6 @@ export const adminCreateVendor = (b: VendorInput) => adminApi.post<Vendor>("/adm
 export const adminUpdateVendor = (id: string, b: VendorInput) => adminApi.put<Vendor>(`/admin/vendors/${id}`, b);
 export const adminDeleteVendor = (id: string) =>
   adminApi.del<{ deleted: boolean }>(`/admin/vendors/${id}`);
-
-// --- Inventory ---
-export const adminStockOverview = () => adminApi.get<{ stock: StockRow[] }>("/admin/inventory");
-export const adminStockMovements = (variantId: string) =>
-  adminApi.get<{ movements: StockMovement[] }>(`/admin/inventory/${variantId}/movements`);
-export const adminReceiveStock = (b: {
-  variant_id: string;
-  vendor_id?: string | null;
-  qty: number;
-  unit_cost?: number | null;
-  note?: string;
-}) => adminApi.post<{ ok: boolean }>("/admin/inventory/receive", b);
-export const adminAdjustStock = (b: { variant_id: string; delta: number; note?: string }) =>
-  adminApi.post<{ ok: boolean }>("/admin/inventory/adjust", b);
 
 // --- Banners ---
 export interface BannerInput {

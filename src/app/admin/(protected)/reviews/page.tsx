@@ -36,6 +36,11 @@ function Stars({ value }: { value: number }) {
 // name would be worse than removing them.
 export default function AdminReviewsPage() {
   const [reviews, setReviews] = useState<AdminReview[]>([]);
+  // "low" is the moderation queue: 1-2 star reviews are the ones worth reading first.
+  const [rating, setRating] = useState<"" | "low" | "1" | "2" | "3" | "4" | "5">("");
+  const shown = reviews.filter((r) =>
+    rating === "" ? true : rating === "low" ? r.rating <= 2 : r.rating === Number(rating),
+  );
   const [loading, setLoading] = useState(true);
 
   function load() {
@@ -127,14 +132,36 @@ export default function AdminReviewsPage() {
           </p>
         </div>
       ) : (
+        <>
+        <div className="mb-3 flex items-center gap-2">
+          <label htmlFor="rating-filter" className="text-sm font-medium text-muted">
+            Rating
+          </label>
+          <select
+            id="rating-filter"
+            value={rating}
+            onChange={(e) => setRating(e.target.value as typeof rating)}
+            className="h-9 rounded-full border border-line bg-white px-3 text-sm text-ink"
+          >
+            <option value="">All ratings</option>
+            <option value="low">1–2 stars (needs attention)</option>
+            {[5, 4, 3, 2, 1].map((n) => (
+              <option key={n} value={String(n)}>
+                {n} star{n > 1 ? "s" : ""}
+              </option>
+            ))}
+          </select>
+        </div>
         <DataGrid<AdminReview>
-        rowData={reviews}
+        rowData={shown}
         columnDefs={columnDefs}
         getRowId={(r) => r.id}
+        searchable="Search by product, customer or comment"
         sortable
         pagination
         pageSize={20}
       />
+        </>
       )}
     </div>
   );

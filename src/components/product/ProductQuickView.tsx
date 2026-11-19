@@ -34,6 +34,8 @@ export function ProductQuickView({ product, onClose }: { product: Product; onClo
   }, [onClose]);
 
   const outOfStock = !variant || variant.stock_qty <= 0;
+  // Same cap as the product page: never offer more than is in stock.
+  const maxQty = Math.max(1, variant?.stock_qty ?? 1);
   const off = variant && variant.mrp > variant.price ? Math.round(((variant.mrp - variant.price) / variant.mrp) * 100) : 0;
 
   function addToCart() {
@@ -113,7 +115,10 @@ export function ProductQuickView({ product, onClose }: { product: Product; onClo
                   key={v.id}
                   type="button"
                   disabled={disabled}
-                  onClick={() => setVariant(v)}
+                  onClick={() => {
+                    setVariant(v);
+                    setQty((q) => Math.min(q, Math.max(1, v.stock_qty)));
+                  }}
                   className={cn(
                     "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
                     selected ? "border-brand-500 bg-brand-50 text-brand-700" : "border-line text-muted hover:border-brand-400",
@@ -129,11 +134,25 @@ export function ProductQuickView({ product, onClose }: { product: Product; onClo
           {/* Qty + add */}
           <div className="mt-4 flex items-center gap-3">
             <div className="flex items-center rounded-lg border border-line">
-              <button type="button" className="px-3 py-1.5 text-lg text-muted" onClick={() => setQty((q) => Math.max(1, q - 1))}>
+              <button
+                type="button"
+                aria-label="Decrease quantity"
+                disabled={qty <= 1}
+                className="px-3 py-1.5 text-lg text-muted disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={() => setQty((q) => Math.max(1, q - 1))}
+              >
                 −
               </button>
-              <span className="w-8 text-center text-sm">{qty}</span>
-              <button type="button" className="px-3 py-1.5 text-lg text-muted" onClick={() => setQty((q) => q + 1)}>
+              <span className="w-8 text-center text-sm" aria-live="polite" aria-label={`Quantity ${qty}`}>
+                {qty}
+              </span>
+              <button
+                type="button"
+                aria-label="Increase quantity"
+                disabled={outOfStock || qty >= maxQty}
+                className="px-3 py-1.5 text-lg text-muted disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={() => setQty((q) => Math.min(maxQty, q + 1))}
+              >
                 +
               </button>
             </div>

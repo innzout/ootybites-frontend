@@ -10,9 +10,21 @@ import { cn } from "@/lib/cn";
 // storefront must not white-screen because of one bad image URL.
 const OPTIMISED_HOSTS = ["res.cloudinary.com"];
 
+// The API's own upload path (images stored without Cloudinary). Must match the
+// remotePatterns entry in next.config.mjs.
+const API_ORIGIN = (() => {
+  try {
+    return new URL(process.env.NEXT_PUBLIC_API_BASE_URL ?? "").origin;
+  } catch {
+    return null;
+  }
+})();
+
 function canOptimise(url: string) {
   try {
-    return OPTIMISED_HOSTS.includes(new URL(url).hostname);
+    const u = new URL(url);
+    if (API_ORIGIN && u.origin === API_ORIGIN && u.pathname.startsWith("/uploads/")) return true;
+    return OPTIMISED_HOSTS.includes(u.hostname);
   } catch {
     return false; // relative or malformed — let next/image handle it as-is
   }

@@ -15,39 +15,48 @@ import { PageHeader } from "@/components/admin/PageHeader";
 import { DataGrid } from "@/components/admin/DataGrid";
 import { GridActions } from "@/components/admin/GridActions";
 import { col, actionCol } from "@/components/admin/gridHelpers";
+import { LoadError } from "@/components/admin/LoadError";
+import { runAdminAction } from "@/lib/adminAction";
 
 export default function AdminCouponsPage() {
   const router = useRouter();
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   function load() {
+    setLoadError(false);
     adminListCoupons()
       .then((d) => setCoupons(d.coupons ?? []))
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
   }
   useEffect(load, []);
 
   async function toggle(c: Coupon) {
-    await adminUpdateCoupon(c.id, {
-      code: c.code,
-      is_active: !c.is_active,
-      discount_value: c.discount_value,
-      max_discount_cap: c.max_discount_cap ?? undefined,
-      applicable_scope: c.applicable_scope,
-      min_order_value: c.min_order_value,
-      min_customer_lifetime_value: c.min_customer_lifetime_value,
-      usage_limit_total: c.usage_limit_total ?? undefined,
-      usage_limit_per_user: c.usage_limit_per_user ?? undefined,
-      product_ids: c.product_ids,
+    const ok = await runAdminAction(async () => {
+      await adminUpdateCoupon(c.id, {
+        code: c.code,
+        is_active: !c.is_active,
+        discount_value: c.discount_value,
+        max_discount_cap: c.max_discount_cap ?? undefined,
+        applicable_scope: c.applicable_scope,
+        min_order_value: c.min_order_value,
+        min_customer_lifetime_value: c.min_customer_lifetime_value,
+        usage_limit_total: c.usage_limit_total ?? undefined,
+        usage_limit_per_user: c.usage_limit_per_user ?? undefined,
+        product_ids: c.product_ids,
+      });
     });
-    load();
+    if (ok) load();
   }
 
   async function remove(id: string) {
     if (!(await askConfirm({ title: "Delete coupon?", tone: "danger", confirmText: "Delete" }))) return;
-    await adminDeleteCoupon(id);
-    load();
+    const ok = await runAdminAction(async () => {
+      await adminDeleteCoupon(id);
+    });
+    if (ok) load();
   }
 
   if (loading)
@@ -55,6 +64,16 @@ export default function AdminCouponsPage() {
       <div className="flex justify-center py-20">
         <Spinner />
       </div>
+    );
+  if (loadError)
+    return (
+      <LoadError
+        what="coupons"
+        onRetry={() => {
+          setLoading(true);
+          load();
+        }}
+      />
     );
 
   const columnDefs = [
@@ -105,6 +124,7 @@ export default function AdminCouponsPage() {
         rowData={coupons}
         columnDefs={columnDefs}
         getRowId={(c) => c.id}
+        searchable="Search coupon codes"
         sortable
         pagination
         pageSize={10}

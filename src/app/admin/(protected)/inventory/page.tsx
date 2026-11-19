@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Search } from "lucide-react";
 import type { Hub, StockRow, StockMovement, Vendor } from "@/types";
 import {
   adminListHubs,
@@ -19,8 +20,12 @@ import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
 import { PageHeader } from "@/components/admin/PageHeader";
 import { cn } from "@/lib/cn";
+import { LOW_STOCK } from "@/lib/stock";
 
-const LOW = 5;
+// Same threshold the storefront uses for its "only N left" nudge.
+const LOW = LOW_STOCK;
+const MOVES_STEP = 20;
+type StockView = "all" | "low" | "out";
 const reasonTone: Record<StockMovement["reason"], "success" | "danger" | "info" | "warning"> = {
   purchase: "success",
   sale: "danger",
@@ -97,6 +102,33 @@ function HubInventory({ hubId }: { hubId: string }) {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
   const [openVariant, setOpenVariant] = useState<string | null>(null);
+  // A hub carries every variant in the catalogue, so the list needs a way to
+  // find one item and to see only what needs reordering.
+  const [stockQuery, setStockQuery] = useState("");
+  const [stockView, setStockView] = useState<StockView>("all");
+  const [stockSort, setStockSort] = useState<"name" | "qty">("name");
+  const [movesShown, setMovesShown] = useState(MOVES_STEP);
+
+  const visibleStock = useMemo(() => {
+    const q = stockQuery.trim().toLowerCase();
+    const rows = stock.filter((r) => {
+      if (stockView === "out" && r.stock_qty > 0) return false;
+      if (stockView === "low" && (r.stock_qty <= 0 || r.stock_qty > LOW)) return false;
+      if (!q) return true;
+      return `${r.product_name} ${r.variant_label} ${r.sku ?? ""}`.toLowerCase().includes(q);
+    });
+    return [...rows].sort((a, b) =>
+      stockSort === "qty" ? a.stock_qty - b.stock_qty : a.product_name.localeCompare(b.product_name),
+    );
+  }, [stock, stockQuery, stockView, stockSort]);
+  const counts = useMemo(
+    () => ({
+      all: stock.length,
+      low: stock.filter((r) => r.stock_qty > 0 && r.stock_qty <= LOW).length,
+      out: stock.filter((r) => r.stock_qty <= 0).length,
+    }),
+    [stock],
+  );
 
   const load = useCallback(() => {
     Promise.all([adminHubStock(hubId), adminHubMovements(hubId)])
@@ -120,9 +152,51 @@ function HubInventory({ hubId }: { hubId: string }) {
 
   return (
     <div className="space-y-6">
-      {/* Stock list */}
+      {/* Stock list: search, needs-attention filters and sort */}
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="relative min-w-0 flex-1 sm:max-w-xs">
+          <span className="sr-only">Search stock</span>
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden="true" />
+          <input
+            type="search"
+            value={stockQuery}
+            maxLength={100}
+            onChange={(e) => setStockQuery(e.target.value)}
+            placeholder="Search product, size or SKU"
+            className="h-9 w-full rounded-full border border-line bg-white pl-9 pr-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/25"
+          />
+        </label>
+        {(["all", "low", "out"] as const).map((v) => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => setStockView(v)}
+            aria-pressed={stockView === v}
+            className={cn(
+              "rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
+              stockView === v ? "bg-brand-gradient text-white" : "border border-line bg-white text-muted hover:text-brand-600",
+            )}
+          >
+            {v === "all" ? "All" : v === "low" ? "Low" : "Out"} ({counts[v]})
+          </button>
+        ))}
+        <select
+          value={stockSort}
+          onChange={(e) => setStockSort(e.target.value as "name" | "qty")}
+          aria-label="Sort stock"
+          className="h-9 rounded-full border border-line bg-white px-3 text-xs text-ink"
+        >
+          <option value="name">Name A–Z</option>
+          <option value="qty">Lowest stock first</option>
+        </select>
+      </div>
       <div className="space-y-2">
-        {stock.map((r) => {
+        {visibleStock.length === 0 && (
+          <p className="rounded-xl border border-line bg-white px-3 py-6 text-center text-sm text-muted">
+            {stock.length === 0 ? "No stock at this hub yet." : "Nothing matches these filters."}
+          </p>
+        )}
+        {visibleStock.map((r) => {
           const out = r.stock_qty <= 0;
           const low = !out && r.stock_qty <= LOW;
           return (
@@ -159,7 +233,7 @@ function HubInventory({ hubId }: { hubId: string }) {
           <Card className="overflow-x-auto">
             <table className="w-full min-w-[440px] text-sm">
               <tbody className="divide-y divide-line">
-                {moves.map((m) => (
+                {moves.slice(0, movesShown).map((m) => (
                   <tr key={m.id}>
                     <td className="p-2.5"><Badge tone={reasonTone[m.reason]}>{reasonLabel[m.reason]}</Badge></td>
                     <td className={cn("p-2.5 font-display font-bold", m.delta >= 0 ? "text-brand-600" : "text-red-600")}>
@@ -177,6 +251,15 @@ function HubInventory({ hubId }: { hubId: string }) {
               </tbody>
             </table>
           </Card>
+        )}
+        {moves.length > movesShown && (
+          <button
+            type="button"
+            onClick={() => setMovesShown((n) => n + MOVES_STEP)}
+            className="mt-2 text-sm font-semibold text-brand-600 hover:underline"
+          >
+            Show more ({moves.length - movesShown} older)
+          </button>
         )}
       </div>
     </div>
@@ -223,8 +306,8 @@ function VariantActions({ hubId, variantId, vendors, onChanged }: { hubId: strin
       <div className="rounded-xl border border-line bg-white p-3">
         <p className="mb-2 text-sm font-semibold text-ink">Receive (purchase)</p>
         <div className="grid grid-cols-2 gap-2">
-          <input className="rounded-lg border border-line px-2 py-1.5 text-sm" placeholder="Qty" value={qty} onChange={(e) => setQty(e.target.value)} />
-          <input className="rounded-lg border border-line px-2 py-1.5 text-sm" placeholder="Cost ₹" value={cost} onChange={(e) => setCost(e.target.value)} />
+          <input className="rounded-lg border border-line px-2 py-1.5 text-sm" placeholder="Qty" inputMode="numeric" maxLength={6} aria-label="Quantity" value={qty} onChange={(e) => setQty(e.target.value.replace(/D/g, ""))} />
+          <input className="rounded-lg border border-line px-2 py-1.5 text-sm" placeholder="Cost ₹" inputMode="decimal" maxLength={10} aria-label="Unit cost in rupees" value={cost} onChange={(e) => setCost(e.target.value.replace(/[^d.]/g, ""))} />
           <select className="col-span-2 rounded-lg border border-line px-2 py-1.5 text-sm" value={vendorId} onChange={(e) => setVendorId(e.target.value)}>
             <option value="">— Vendor (optional) —</option>
             {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
@@ -234,8 +317,8 @@ function VariantActions({ hubId, variantId, vendors, onChanged }: { hubId: strin
       </div>
       <div className="rounded-xl border border-line bg-white p-3">
         <p className="mb-2 text-sm font-semibold text-ink">Adjust (±)</p>
-        <input className="w-full rounded-lg border border-line px-2 py-1.5 text-sm" placeholder="e.g. -3 or +2" value={adj} onChange={(e) => setAdj(e.target.value)} />
-        <input className="mt-2 w-full rounded-lg border border-line px-2 py-1.5 text-sm" placeholder="Reason" value={note} onChange={(e) => setNote(e.target.value)} />
+        <input className="w-full rounded-lg border border-line px-2 py-1.5 text-sm" placeholder="e.g. -3 or +2" aria-label="Stock adjustment" inputMode="numeric" maxLength={7} value={adj} onChange={(e) => setAdj(e.target.value.replace(/[^d+-]/g, ""))} />
+        <input className="mt-2 w-full rounded-lg border border-line px-2 py-1.5 text-sm" placeholder="Reason" aria-label="Reason for adjustment" maxLength={200} value={note} onChange={(e) => setNote(e.target.value)} />
         <Button size="sm" variant="outline" className="mt-2" onClick={adjust} loading={busy} disabled={!adj || Number(adj) === 0}>Apply</Button>
       </div>
     </div>

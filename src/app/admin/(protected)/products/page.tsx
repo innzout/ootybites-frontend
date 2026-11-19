@@ -1,7 +1,7 @@
 "use client";
 import { askConfirm } from "@/lib/confirm";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Search } from "lucide-react";
 import type { ICellRendererParams } from "@/components/admin/gridHelpers";
@@ -16,6 +16,9 @@ import { Pagination } from "@/components/admin/Pagination";
 import { useServerTable } from "@/components/admin/useServerTable";
 import { GridActions } from "@/components/admin/GridActions";
 import { DataGrid } from "@/components/admin/DataGrid";
+import { LoadError } from "@/components/admin/LoadError";
+import { runAdminAction } from "@/lib/adminAction";
+import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { col, sortCol, actionCol } from "@/components/admin/gridHelpers";
 
 // Code-split: AG Grid is heavy — load it lazily and keep it out of the initial bundle.
@@ -56,15 +59,11 @@ const stockFilters: { value: StockFilter; label: string }[] = [
 export default function AdminProductsPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
-  const [q, setQ] = useState("");
   const [active, setActive] = useState<Visibility>("");
   const [stock, setStock] = useState<StockFilter>("");
 
-  // Debounce the search box into the query that drives the fetch.
-  useEffect(() => {
-    const t = setTimeout(() => setQ(search.trim()), 300);
-    return () => clearTimeout(t);
-  }, [search]);
+  // The query that drives the fetch settles 300 ms after typing stops.
+  const q = useDebouncedValue(search.trim());
 
   const fetcher = useCallback(
     (p: { page: number; limit: number; sort?: string; order?: "asc" | "desc" }) =>
@@ -79,19 +78,21 @@ export default function AdminProductsPage() {
   const grid = useServerTable<Product>(fetcher, { limit: 20, deps: [q, active, stock] });
 
   async function toggleVisible(p: Product) {
-    await adminUpdateProduct(p.id, {
-      name: p.name,
-      slug: p.slug,
-      description: p.description,
-      is_active: !p.is_active,
-    });
-    grid.reload();
+    const ok = await runAdminAction(() =>
+      adminUpdateProduct(p.id, {
+        name: p.name,
+        slug: p.slug,
+        description: p.description,
+        is_active: !p.is_active,
+      }),
+    );
+    if (ok) grid.reload();
   }
 
   async function removeProduct(id: string) {
     if (!(await askConfirm({ title: "Delete product?", message: "This removes the product and all its variants.", tone: "danger", confirmText: "Delete" }))) return;
-    await adminDeleteProduct(id);
-    grid.reload();
+    const ok = await runAdminAction(() => adminDeleteProduct(id));
+    if (ok) grid.reload();
   }
 
   const columnDefs = [
@@ -176,6 +177,7 @@ export default function AdminProductsPage() {
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
           <input
             value={search}
+            maxLength={100}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name or slug…"
             className="h-10 w-full rounded-xl border border-line bg-white pl-9 pr-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/25"
@@ -205,14 +207,18 @@ export default function AdminProductsPage() {
         </select>
         <span className="ml-auto text-xs text-muted">Click the Product header to sort</span>
       </div>
-      <DataGrid<Product>
-        rowData={grid.rows}
-        columnDefs={columnDefs}
-        loading={grid.loading}
-        getRowId={(p) => p.id}
-        onServerSort={grid.onServerSort}
-        emptyText={q || active || stock ? "No products match these filters." : "No products yet — add your first."}
-      />
+      {grid.error ? (
+        <LoadError what="products" onRetry={grid.reload} />
+      ) : (
+        <DataGrid<Product>
+          rowData={grid.rows}
+          columnDefs={columnDefs}
+          loading={grid.loading}
+          getRowId={(p) => p.id}
+          onServerSort={grid.onServerSort}
+          emptyText={q || active || stock ? "No products match these filters." : "No products yet — add your first."}
+        />
+      )}
 
       <Pagination page={grid.page} total={grid.total} limit={grid.limit} onPage={grid.setPage} />
     </div>

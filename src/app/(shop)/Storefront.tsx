@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 
 const FEATURES = [
-  { icon: Mountain, title: "Grown in the hills", body: "Everything comes from farms and makers within the Nilgiri range." },
+  { icon: Mountain, title: "Made in the Nilgiris", body: "Everything comes from bakers, makers and farms within the Nilgiri range." },
   { icon: Leaf, title: "Small-batch & fresh", body: "We only stock what's just been made or harvested this season." },
   { icon: Truck, title: "Cash on delivery", body: "Carefully packed and dispatched from Ooty — pay when it arrives." },
 ];
@@ -42,11 +42,13 @@ export function Storefront({
   initialTotal,
   categories,
   banners,
+  expressAvailable,
 }: {
   initialProducts: Product[];
   initialTotal: number;
   categories: Category[];
   banners: Banner[];
+  expressAvailable: boolean;
 }) {
   const searchParams = useSearchParams();
   const customer = useAuthStore((s) => s.customer);
@@ -122,23 +124,27 @@ export function Storefront({
           shop sells, rather than a greeting — the greeting is still there, but
           as supporting copy, because "Welcome to Ootybites" told a search engine
           nothing about tea, honey or oils. */}
-      <NilgiriHero firstName={firstName} />
+      {/* Compact when promo banners follow: two tall images in a row pushed the
+          first product more than a screen and a half down the page. */}
+      <NilgiriHero firstName={firstName} compact={banners.length > 0} />
 
       {banners.length > 0 && <BannerCarousel banners={banners} />}
 
-      <div className={banners.length > 0 ? "mt-8" : "mt-2"}>
-        <ExpressBanner />
-      </div>
+      {expressAvailable && (
+        <div className={banners.length > 0 ? "mt-8" : "mt-2"}>
+          <ExpressBanner />
+        </div>
+      )}
 
       {/* Browse: search + categories + sort */}
-      <div id="products" className="mt-12 scroll-mt-20">
+      <div id="products" className="mt-10 scroll-mt-20">
         <div className="mb-5 flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
           <div>
             <h2 className="font-display text-2xl font-extrabold text-ink sm:text-[1.75rem]">
               Shop the hills
             </h2>
             <p className="mt-0.5 text-sm text-muted">
-              Small-batch tea, honey, oils and varki from the Nilgiris.
+              Small-batch varki, snacks and chocolates — plus tea, honey and oils from the Nilgiris.
             </p>
           </div>
           {total > 0 && (

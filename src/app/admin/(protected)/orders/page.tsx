@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react";
 import Link from "next/link";
-import { Map as MapIcon } from "lucide-react";
+import { Map as MapIcon, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { ICellRendererParams } from "@/components/admin/gridHelpers";
 import type { Order, OrderStatus } from "@/types";
@@ -14,6 +14,8 @@ import { PageHeader } from "@/components/admin/PageHeader";
 import { Pagination } from "@/components/admin/Pagination";
 import { useServerTable } from "@/components/admin/useServerTable";
 import { DataGrid } from "@/components/admin/DataGrid";
+import { LoadError } from "@/components/admin/LoadError";
+import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { col, sortCol } from "@/components/admin/gridHelpers";
 import { cn } from "@/lib/cn";
 
@@ -31,14 +33,28 @@ const statuses = [
 export default function AdminOrdersPage() {
   const router = useRouter();
   const [status, setStatus] = useState("placed");
+  // Free-text search (order number, customer name or phone) and an optional
+  // date range. Either date may be set on its own.
+  const [search, setSearch] = useState("");
+  const q = useDebouncedValue(search.trim());
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const filtered = q !== "" || from !== "" || to !== "" || status !== "placed";
 
-  // Server-side pagination + sorting, refetching when the status filter changes.
+  // Server-side pagination + sorting, refetching when any filter changes.
   const fetcher = useCallback(
     (p: { page: number; limit: number; sort?: string; order?: "asc" | "desc" }) =>
-      adminListOrders({ ...p, status }).then((d) => ({ rows: d.orders ?? [], total: d.total ?? 0 })),
-    [status],
+      adminListOrders({ ...p, status, q, from, to }).then((d) => ({ rows: d.orders ?? [], total: d.total ?? 0 })),
+    [status, q, from, to],
   );
-  const grid = useServerTable<Order>(fetcher, { limit: 20, deps: [status] });
+  const grid = useServerTable<Order>(fetcher, { limit: 20, deps: [status, q, from, to] });
+
+  function clearFilters() {
+    setStatus("placed");
+    setSearch("");
+    setFrom("");
+    setTo("");
+  }
 
   const columnDefs = [
     col<Order>("order_number", "Order", {
@@ -117,15 +133,59 @@ export default function AdminOrdersPage() {
         ))}
         <span className="ml-auto text-xs text-muted">Click a column header to sort</span>
       </div>
-      <DataGrid<Order>
-        rowData={grid.rows}
-        columnDefs={columnDefs}
-        loading={grid.loading}
-        getRowId={(o) => o.id}
-        onRowClicked={(o) => router.push(`/admin/orders/${o.id}`)}
-        onServerSort={grid.onServerSort}
-        emptyText="No orders match this filter."
-      />
+
+      <div className="mb-4 flex flex-wrap items-end gap-3">
+        <label className="relative w-full sm:max-w-xs">
+          <span className="sr-only">Search orders</span>
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden="true" />
+          <input
+            type="search"
+            value={search}
+            maxLength={100}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Order no., customer name or phone"
+            className="h-10 w-full rounded-xl border border-line bg-white pl-9 pr-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/25"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs font-medium text-muted">
+          From
+          <input
+            type="date"
+            value={from}
+            max={to || undefined}
+            onChange={(e) => setFrom(e.target.value)}
+            className="h-10 rounded-xl border border-line bg-white px-2 text-sm text-ink"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs font-medium text-muted">
+          To
+          <input
+            type="date"
+            value={to}
+            min={from || undefined}
+            onChange={(e) => setTo(e.target.value)}
+            className="h-10 rounded-xl border border-line bg-white px-2 text-sm text-ink"
+          />
+        </label>
+        {filtered && (
+          <button type="button" onClick={clearFilters} className="h-10 px-2 text-sm font-semibold text-brand-600 hover:underline">
+            Clear filters
+          </button>
+        )}
+      </div>
+      {grid.error ? (
+        <LoadError what="orders" onRetry={grid.reload} />
+      ) : (
+        <DataGrid<Order>
+          rowData={grid.rows}
+          columnDefs={columnDefs}
+          loading={grid.loading}
+          getRowId={(o) => o.id}
+          onRowClicked={(o) => router.push(`/admin/orders/${o.id}`)}
+          onServerSort={grid.onServerSort}
+          emptyText={q ? `No orders match “${q}”.` : "No orders match this filter."}
+        />
+      )}
 
       <Pagination page={grid.page} total={grid.total} limit={grid.limit} onPage={grid.setPage} />
     </div>

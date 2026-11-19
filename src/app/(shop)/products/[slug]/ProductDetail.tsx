@@ -10,6 +10,7 @@ import { useCartStore } from "@/store/cartStore";
 import { useWishlistStore } from "@/store/wishlistStore";
 import { useRecentStore } from "@/store/recentStore";
 import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
 import { ProductReviews } from "@/components/product/ProductReviews";
 import { RemoteImage } from "@/components/ui/RemoteImage";
 import { cn } from "@/lib/cn";
@@ -32,6 +33,17 @@ export function ProductDetail({ product }: { product: Product }) {
     product.variants.find((v) => v.is_active && v.stock_qty > 0) ?? product.variants[0] ?? null,
   );
   const [activeImg, setActiveImg] = useState(primaryIdx);
+  // Whether the shopper has switched gallery image yet. The flip animation
+  // starts at opacity 0, and the browser does not count an invisible image as
+  // painted - so animating the first, server-rendered image delayed this
+  // page's Largest Contentful Paint by the length of the animation on every
+  // view. The image they arrive on now renders immediately; the flip is kept
+  // for the swaps they trigger themselves.
+  const [swapped, setSwapped] = useState(false);
+  function showImage(i: number) {
+    setActiveImg(i);
+    setSwapped(true);
+  }
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
 
@@ -39,6 +51,14 @@ export function ProductDetail({ product }: { product: Product }) {
   const gallery = product.images.length > 0 ? product.images : [];
   const shown = gallery[activeImg] ?? primary;
   const outOfStock = !variant || variant.stock_qty <= 0;
+  // Never let the stepper ask for more than exists. The server rejects an
+  // over-order at checkout anyway, but discovering that only after filling in
+  // an address is a poor way to find out.
+  const maxQty = Math.max(1, variant?.stock_qty ?? 1);
+  const percentOff =
+    variant && variant.mrp > variant.price
+      ? Math.round(((variant.mrp - variant.price) / variant.mrp) * 100)
+      : 0;
   const activePrices = product.variants.filter((v) => v.is_active).map((v) => v.price);
   const fromPrice = activePrices.length ? Math.min(...activePrices) : null;
   const wished = wishItems.some((i) => i.id === product.id);
@@ -72,14 +92,15 @@ export function ProductDetail({ product }: { product: Product }) {
       <div>
         <div className="relative aspect-square overflow-hidden rounded-2xl bg-brand-50 shadow-product">
           {/* The PDP hero is the LCP element — the one image on the site that
-              should load eagerly. key forces the flip animation on each swap. */}
+              should load eagerly. key remounts it on each swap so the flip
+              replays, but only after the first swap (see `swapped`). */}
           <RemoteImage
             key={shown?.url}
             src={shown?.url}
             alt={product.name}
             sizes="(min-width: 768px) 560px, 100vw"
             priority
-            className="animate-rotate-in"
+            className={swapped ? "animate-rotate-in" : undefined}
           />
         </div>
         {/* Thumbnails */}
@@ -89,7 +110,7 @@ export function ProductDetail({ product }: { product: Product }) {
               <button
                 key={img.id}
                 type="button"
-                onClick={() => setActiveImg(i)}
+                onClick={() => showImage(i)}
                 aria-label={`View image ${i + 1} of ${gallery.length}`}
                 aria-current={i === activeImg}
                 className={`relative h-16 w-16 overflow-hidden rounded-xl border-2 transition-colors ${
@@ -120,7 +141,21 @@ export function ProductDetail({ product }: { product: Product }) {
         {product.description && <p className="mt-2 text-neutral-600">{product.description}</p>}
 
         {variant && (
-          <p className="mt-4 text-2xl font-semibold text-brand-600">{formatPrice(variant.price)}</p>
+          <div className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <p className="text-2xl font-semibold text-brand-600">{formatPrice(variant.price)}</p>
+            {/* The listing card shows the MRP and the saving; the product page
+                showed neither, so the discount disappeared at the point of
+                deciding to buy. */}
+            {percentOff > 0 && (
+              <>
+                <p className="text-base text-muted line-through">
+                  <span className="sr-only">Was </span>
+                  {formatPrice(variant.mrp)}
+                </p>
+                <Badge tone="accent">{percentOff}% off</Badge>
+              </>
+            )}
+          </div>
         )}
         {variant && isLowStock(variant.stock_qty) && (
           <p className="mt-1 text-sm font-semibold text-accent-600">
@@ -138,7 +173,12 @@ export function ProductDetail({ product }: { product: Product }) {
                 <button
                   key={v.id}
                   disabled={disabled}
-                  onClick={() => setVariant(v)}
+                  onClick={() => {
+                    setVariant(v);
+                    // A different size may have less stock than the quantity
+                    // already chosen.
+                    setQty((q) => Math.min(q, Math.max(1, v.stock_qty)));
+                  }}
                   className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
                     selected
                       ? "border-brand-500 bg-brand-50 text-brand-700"
@@ -154,11 +194,25 @@ export function ProductDetail({ product }: { product: Product }) {
 
         <div className="mt-6 flex items-center gap-4">
           <div className="flex items-center rounded-lg border border-neutral-300">
-            <button className="px-3 py-2 text-lg" onClick={() => setQty((q) => Math.max(1, q - 1))}>
+            <button
+              type="button"
+              aria-label="Decrease quantity"
+              disabled={qty <= 1}
+              className="px-3 py-2 text-lg disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={() => setQty((q) => Math.max(1, q - 1))}
+            >
               −
             </button>
-            <span className="w-10 text-center">{qty}</span>
-            <button className="px-3 py-2 text-lg" onClick={() => setQty((q) => q + 1)}>
+            <span className="w-10 text-center" aria-live="polite" aria-label={`Quantity ${qty}`}>
+              {qty}
+            </span>
+            <button
+              type="button"
+              aria-label="Increase quantity"
+              disabled={outOfStock || qty >= maxQty}
+              className="px-3 py-2 text-lg disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={() => setQty((q) => Math.min(maxQty, q + 1))}
+            >
               +
             </button>
           </div>
@@ -166,6 +220,17 @@ export function ProductDetail({ product }: { product: Product }) {
             {outOfStock ? "Out of stock" : added ? "Added ✓" : "Add to cart"}
           </Button>
         </div>
+
+        {!outOfStock && qty >= maxQty && maxQty > 1 && (
+          <p className="mt-2 text-xs text-muted">That is all we have in stock right now.</p>
+        )}
+
+        {/* What a first-time buyer wants to know before committing: how they
+            pay and where it ships from. Both are fixed facts of this shop. */}
+        <ul className="mt-5 flex flex-col gap-1.5 border-t border-line pt-4 text-sm text-muted">
+          <li>Cash on delivery — pay when it arrives.</li>
+          <li>Packed and dispatched from Ooty.</li>
+        </ul>
 
         {added && (
           <button

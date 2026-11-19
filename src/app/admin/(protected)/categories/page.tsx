@@ -16,14 +16,18 @@ import { PageHeader } from "@/components/admin/PageHeader";
 import { DataGrid } from "@/components/admin/DataGrid";
 import { GridActions } from "@/components/admin/GridActions";
 import { col, actionCol } from "@/components/admin/gridHelpers";
+import { LoadError } from "@/components/admin/LoadError";
 
 export default function AdminCategoriesPage() {
   const router = useRouter();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   function load() {
-    adminListCategories().then((d) => setCategories(d.categories ?? [])).finally(() => setLoading(false));
+    setLoadError(false);
+    adminListCategories().then((d) => setCategories(d.categories ?? [])).catch(() => setLoadError(true))
+      .finally(() => setLoading(false));
   }
   useEffect(load, []);
 
@@ -43,6 +47,16 @@ export default function AdminCategoriesPage() {
       <div className="flex justify-center py-20">
         <Spinner />
       </div>
+    );
+  if (loadError)
+    return (
+      <LoadError
+        what="categories"
+        onRetry={() => {
+          setLoading(true);
+          load();
+        }}
+      />
     );
 
   const columnDefs = [
@@ -81,6 +95,7 @@ export default function AdminCategoriesPage() {
         rowData={categories}
         columnDefs={columnDefs}
         getRowId={(c) => c.id}
+        searchable="Search categories"
         sortable
         pagination
         pageSize={10}

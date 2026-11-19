@@ -14,34 +14,43 @@ import { PageHeader } from "@/components/admin/PageHeader";
 import { DataGrid } from "@/components/admin/DataGrid";
 import { GridActions } from "@/components/admin/GridActions";
 import { col, actionCol } from "@/components/admin/gridHelpers";
+import { LoadError } from "@/components/admin/LoadError";
+import { runAdminAction } from "@/lib/adminAction";
 
 export default function AdminBannersPage() {
   const router = useRouter();
   const [banners, setBanners] = useState<Banner[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   function load() {
+    setLoadError(false);
     adminListBanners()
       .then((d) => setBanners(d.banners ?? []))
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
   }
   useEffect(load, []);
 
   async function toggleVisible(b: Banner) {
-    await adminUpdateBanner(b.id, {
-      image_url: b.image_url,
-      title: b.title ?? null,
-      link_url: b.link_url ?? null,
-      sort_order: b.sort_order,
-      is_active: !b.is_active,
+    const ok = await runAdminAction(async () => {
+      await adminUpdateBanner(b.id, {
+        image_url: b.image_url,
+        title: b.title ?? null,
+        link_url: b.link_url ?? null,
+        sort_order: b.sort_order,
+        is_active: !b.is_active,
+      });
     });
-    load();
+    if (ok) load();
   }
 
   async function remove(id: string) {
     if (!(await askConfirm({ title: "Delete banner?", tone: "danger", confirmText: "Delete" }))) return;
-    await adminDeleteBanner(id);
-    load();
+    const ok = await runAdminAction(async () => {
+      await adminDeleteBanner(id);
+    });
+    if (ok) load();
   }
 
   if (loading)
@@ -49,6 +58,16 @@ export default function AdminBannersPage() {
       <div className="flex justify-center py-20">
         <Spinner />
       </div>
+    );
+  if (loadError)
+    return (
+      <LoadError
+        what="banners"
+        onRetry={() => {
+          setLoading(true);
+          load();
+        }}
+      />
     );
 
   const columnDefs = [

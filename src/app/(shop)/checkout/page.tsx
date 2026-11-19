@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCartStore } from "@/store/cartStore";
 import { useAuthStore } from "@/store/authStore";
@@ -36,6 +36,13 @@ const emptyShipping: ShippingInput = {
   state: DEFAULT_STATE,
   pincode: "",
 };
+
+// crypto.randomUUID needs a secure context (https or localhost). Fall back for
+// plain-http LAN testing on a phone, where it is undefined.
+function newKey(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+}
 
 const toShipping = (a: Address): ShippingInput => ({
   name: a.name,
@@ -75,6 +82,10 @@ export default function CheckoutPage() {
   const [discount, setDiscount] = useState(0);
   const [couponMsg, setCouponMsg] = useState<string | null>(null);
   const [placing, setPlacing] = useState(false);
+  // One key per purchase attempt. It survives a retry of the same order (so a
+  // dropped connection cannot produce a second order), and is replaced once an
+  // order succeeds or the cart changes - at which point it is a new purchase.
+  const idemKey = useRef<string>(newKey());
   const [error, setError] = useState<string | null>(null);
   const [express, setExpress] = useState<ExpressResult | null>(null);
   const [checkingExpress, setCheckingExpress] = useState(false);
@@ -126,6 +137,8 @@ export default function CheckoutPage() {
   useEffect(() => {
     setDiscount(0);
     setCouponMsg(null);
+    // A different cart is a different purchase.
+    idemKey.current = newKey();
   }, [items]);
 
   // Patch the shipping address and re-check just the fields that changed, so a
@@ -190,7 +203,8 @@ export default function CheckoutPage() {
           /* non-fatal — still place the order */
         }
       }
-      const order = await placeOrder(items, ship, code.trim() || undefined, deliveryNote.trim() || undefined);
+      const order = await placeOrder(items, ship, code.trim() || undefined, deliveryNote.trim() || undefined, idemKey.current);
+      idemKey.current = newKey();
       clear();
       toast.success("Order placed!");
       router.push(`/orders/${order.id}`);

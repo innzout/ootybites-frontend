@@ -1,24 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Zap, ArrowRight } from "lucide-react";
-import { listExpressAreas } from "@/lib/endpoints";
 
 // ExpressBanner is the home-page entry point into the dedicated 24-hour delivery
-// flow. It only renders when express coverage exists (at least one area has a
-// hub), so shoppers never tap through to an empty screen.
+// flow. The caller renders it only when express coverage exists - decided on the
+// server (getCachedExpressAvailable), so it is in the first paint rather than
+// appearing after a client fetch and shifting the page.
 export function ExpressBanner() {
-  const [available, setAvailable] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    listExpressAreas()
-      .then((d) => setAvailable((d.areas ?? []).length > 0))
-      .catch(() => setAvailable(false));
-  }, []);
-
-  if (!available) return null;
-
   return (
     <Link
       href="/express"
@@ -30,9 +19,9 @@ export function ExpressBanner() {
       <div className="min-w-0 flex-1">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/85">Ootybites Express</p>
         <p className="mt-0.5 font-display text-lg font-extrabold leading-tight sm:text-xl">
-          24-Hour Delivery in your area
+          24-hour delivery near you
         </p>
-        <p className="mt-0.5 text-sm text-white/85">Choose your area and see what&rsquo;s in stock near you.</p>
+        <p className="mt-0.5 text-sm text-white/85">Check whether your area is covered, and see what&rsquo;s in stock at your nearest hub.</p>
       </div>
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/15 transition-transform group-hover:translate-x-0.5">
         <ArrowRight className="h-5 w-5" />

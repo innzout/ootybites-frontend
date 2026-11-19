@@ -91,8 +91,9 @@ export function CategoryBrowse({
       ) : (
         <>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5 lg:grid-cols-4">
-            {products.map((p) => (
-              <ProductCard key={p.id} product={p} />
+            {products.map((p, i) => (
+              // The first row on a phone is above the fold here.
+              <ProductCard key={p.id} product={p} priority={i < 2} />
             ))}
           </div>
           {hasMore && (

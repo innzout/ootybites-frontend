@@ -1,5 +1,5 @@
 // Typed endpoint helpers over the api client — keeps pages free of URL strings.
-import { api } from "@/lib/api";
+import { api, request } from "@/lib/api";
 import type { Product, Order, CouponPreview, CartItem, Banner, Address, Notification, Area } from "@/types";
 
 // --- Auth ---
@@ -45,6 +45,16 @@ export const getPage = (slug: string) => api.get<Page>(`/pages/${slug}`);
 
 // --- 24-hour express (public): serviceable areas + in-stock products per area ---
 export const listExpressAreas = () => api.get<{ areas: Area[] }>("/express/areas");
+// Areas ranked by how close their hub is to a point, for "Use my location".
+export interface NearbyArea extends Area {
+  distance_km: number;
+  in_range: boolean;
+}
+export const nearestExpressAreas = (lat: number, lng: number) =>
+  api.get<{ areas: NearbyArea[]; radius_km: number }>(
+    `/express/nearest?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`,
+  );
+
 export const listExpressProducts = (areaId: string) =>
   api.get<{ products: Product[]; hub_name: string | null }>(
     `/express/products?area_id=${encodeURIComponent(areaId)}`,
@@ -107,7 +117,6 @@ export interface CustomerProfile {
   phone: string;
   name?: string | null;
 }
-export const getMe = () => api.get<CustomerProfile>("/me", true);
 export const updateMe = (name: string) => api.put<CustomerProfile>("/me", { name }, true);
 
 // --- Saved addresses (customer) ---
@@ -153,14 +162,40 @@ export interface ShippingInput {
   lng?: number | null;
 }
 
-export const placeOrder = (items: CartItem[], shipping: ShippingInput, couponCode?: string, deliveryNote?: string) =>
-  api.post<Order>(
-    "/orders",
-    { items: toLines(items), coupon_code: couponCode ?? "", shipping, delivery_note: deliveryNote ?? "" },
-    true,
-  );
+// idempotencyKey identifies one purchase attempt. Sending the same key again
+// (a retry after a dropped connection) returns the order already created
+// instead of placing a second one.
+export const placeOrder = (
+  items: CartItem[],
+  shipping: ShippingInput,
+  couponCode: string | undefined,
+  deliveryNote: string | undefined,
+  idempotencyKey: string,
+) =>
+  request<Order>("/orders", {
+    method: "POST",
+    auth: true,
+    headers: { "Idempotency-Key": idempotencyKey },
+    body: { items: toLines(items), coupon_code: couponCode ?? "", shipping, delivery_note: deliveryNote ?? "" },
+  });
 
-export const listOrders = () => api.get<{ orders: Order[] }>("/orders", true);
+// Filters for the customer's and dealer's own order lists. The owner is taken
+// from the session on the server, never from these.
+export interface OwnOrdersQuery {
+  q?: string;
+  status?: string;
+  sort?: "placed_at" | "total";
+  order?: "asc" | "desc";
+  page?: number;
+  limit?: number;
+}
+export function ownOrdersQS(p: OwnOrdersQuery): string {
+  const q = new URLSearchParams();
+  Object.entries(p).forEach(([k, v]) => v !== undefined && v !== "" && q.set(k, String(v)));
+  return q.toString();
+}
+export const listOrders = (p: OwnOrdersQuery = {}) =>
+  api.get<{ orders: Order[]; total: number }>(`/orders?${ownOrdersQS(p)}`, true);
 export const getOrder = (id: string) => api.get<Order>(`/orders/${id}`, true);
 // Customer self-cancel (only while the order is still 'placed').
 export const cancelOrder = (id: string, reason?: string) =>

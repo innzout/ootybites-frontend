@@ -16,15 +16,19 @@ import { Spinner } from "@/components/ui/Spinner";
 import { PageHeader } from "@/components/admin/PageHeader";
 import { DataGrid } from "@/components/admin/DataGrid";
 import { col, actionCol } from "@/components/admin/gridHelpers";
+import { LoadError } from "@/components/admin/LoadError";
 
 export default function AdminAdminsPage() {
   const router = useRouter();
   const meId = useAdminAuthStore((s) => s.adminId);
   const [admins, setAdmins] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   function load() {
-    adminListAdmins().then((d) => setAdmins(d.admins ?? [])).finally(() => setLoading(false));
+    setLoadError(false);
+    adminListAdmins().then((d) => setAdmins(d.admins ?? [])).catch(() => setLoadError(true))
+      .finally(() => setLoading(false));
   }
   useEffect(load, []);
 
@@ -44,6 +48,16 @@ export default function AdminAdminsPage() {
       <div className="flex justify-center py-20">
         <Spinner />
       </div>
+    );
+  if (loadError)
+    return (
+      <LoadError
+        what="admins"
+        onRetry={() => {
+          setLoading(true);
+          load();
+        }}
+      />
     );
 
   const columnDefs = [
@@ -115,6 +129,7 @@ export default function AdminAdminsPage() {
         rowData={admins}
         columnDefs={columnDefs}
         getRowId={(a) => a.id}
+        searchable="Search admins by username or name"
         sortable
         pagination
         pageSize={10}

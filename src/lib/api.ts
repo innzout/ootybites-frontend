@@ -63,10 +63,12 @@ interface RequestOptions {
   adminAuth?: boolean; // attach the admin bearer token
   dealerAuth?: boolean; // attach the dealer bearer token
   signal?: AbortSignal;
+  // Extra request headers, e.g. Idempotency-Key on order placement.
+  headers?: Record<string, string>;
 }
 
-async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
+export async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
+  const headers: Record<string, string> = { "Content-Type": "application/json", ...opts.headers };
   if (opts.dealerAuth) {
     const token = getDealerToken();
     if (token) headers.Authorization = `Bearer ${token}`;

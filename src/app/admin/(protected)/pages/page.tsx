@@ -17,14 +17,18 @@ import { PageHeader } from "@/components/admin/PageHeader";
 import { DataGrid } from "@/components/admin/DataGrid";
 import { GridActions } from "@/components/admin/GridActions";
 import { col, actionCol } from "@/components/admin/gridHelpers";
+import { LoadError } from "@/components/admin/LoadError";
 
 export default function AdminPagesPage() {
   const router = useRouter();
   const [pages, setPages] = useState<Page[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   function load() {
-    adminListPages().then((d) => setPages(d.pages ?? [])).finally(() => setLoading(false));
+    setLoadError(false);
+    adminListPages().then((d) => setPages(d.pages ?? [])).catch(() => setLoadError(true))
+      .finally(() => setLoading(false));
   }
   useEffect(load, []);
 
@@ -44,6 +48,16 @@ export default function AdminPagesPage() {
       <div className="flex justify-center py-20">
         <Spinner />
       </div>
+    );
+  if (loadError)
+    return (
+      <LoadError
+        what="content pages"
+        onRetry={() => {
+          setLoading(true);
+          load();
+        }}
+      />
     );
 
   const columnDefs = [
@@ -100,6 +114,7 @@ export default function AdminPagesPage() {
         rowData={pages}
         columnDefs={columnDefs}
         getRowId={(p) => p.id}
+        searchable="Search pages by title or slug"
         sortable
         pagination
         pageSize={10}

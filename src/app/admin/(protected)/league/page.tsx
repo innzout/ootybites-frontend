@@ -182,6 +182,7 @@ export default function AdminLeaguePage() {
         rowData={seasons}
         columnDefs={columnDefs}
         getRowId={(s) => s.id}
+        searchable="Search seasons"
         sortable
         pagination
         pageSize={10}

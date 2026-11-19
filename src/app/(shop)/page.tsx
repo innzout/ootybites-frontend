@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import { listProducts, listCategories, listBanners } from "@/lib/endpoints";
+import { listProducts } from "@/lib/endpoints";
+import { getCachedBanners, getCachedCategories, getCachedExpressAvailable } from "@/lib/cachedCatalog";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { DEFAULT_DESCRIPTION, SITE_URL, organizationJsonLd, websiteJsonLd } from "@/lib/seo";
 import { Storefront } from "./Storefront";
@@ -25,10 +26,13 @@ export const metadata: Metadata = {
 // so the storefront grid is in the initial HTML, then hands off to the client
 // Storefront for search/sort/filter. Emits Organization + WebSite JSON-LD.
 export default async function HomePage() {
-  const [prod, cats, ban] = await Promise.all([
+  // Only the product list is fetched per request - it carries live price and
+  // stock. Categories and banners come from a shared cache (lib/cachedCatalog).
+  const [prod, categories, banners, expressAvailable] = await Promise.all([
     listProducts({ sort: "featured", page: 1, limit: 12 }).catch(() => ({ products: [], total: 0 })),
-    listCategories().catch(() => ({ categories: [] })),
-    listBanners().catch(() => ({ banners: [] })),
+    getCachedCategories(),
+    getCachedBanners(),
+    getCachedExpressAvailable(),
   ]);
 
   return (
@@ -38,8 +42,9 @@ export default async function HomePage() {
         <Storefront
           initialProducts={prod.products ?? []}
           initialTotal={prod.total ?? 0}
-          categories={cats.categories ?? []}
-          banners={ban.banners ?? []}
+          categories={categories}
+          banners={banners}
+          expressAvailable={expressAvailable}
         />
       </Suspense>
     </>

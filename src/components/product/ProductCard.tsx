@@ -14,7 +14,10 @@ import { cn } from "@/lib/cn";
 // ProductCard shows a product's primary image, name, and the lowest variant
 // price ("from ₹X"). Clicking it opens a compact quick-view popup (image rotates
 // in) rather than navigating away; the popup links through to the full page.
-export function ProductCard({ product }: { product: Product }) {
+// priority: set only for the first cards of a grid that starts above the fold,
+// where the first photo is the page's largest paint. Lazy-loading that one
+// delayed it on purpose. Leave it off everywhere else.
+export function ProductCard({ product, priority = false }: { product: Product; priority?: boolean }) {
   const [open, setOpen] = useState(false);
   const wished = useWishlistStore((s) => s.has(product.id));
   const toggleWish = useWishlistStore((s) => s.toggle);
@@ -51,6 +54,7 @@ export function ProductCard({ product }: { product: Product }) {
             <RemoteImage
               src={primary?.url}
               alt={product.name}
+              priority={priority}
               // Grid is 2-up on mobile, 3-up at sm, 4-up at lg (max 1152px shell).
               sizes="(min-width: 1024px) 288px, (min-width: 640px) 33vw, 50vw"
               className={cn(

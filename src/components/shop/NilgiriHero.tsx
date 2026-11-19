@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { cn } from "@/lib/cn";
 import { ArrowDown } from "lucide-react";
 
 // The storefront's brand moment: a real photograph of the Nilgiris behind the
@@ -18,7 +19,15 @@ import { ArrowDown } from "lucide-react";
 // brand site. The .hero-hills gradient underneath still shows if the image
 // fails, so the hero is never blank.
 
-export function NilgiriHero({ firstName }: { firstName?: string }) {
+export function NilgiriHero({
+  firstName,
+  compact = false,
+}: {
+  firstName?: string;
+  // Shorter variant for when promo banners sit directly underneath, so the two
+  // images together do not push the product grid off the first screen.
+  compact?: boolean;
+}) {
   return (
     <section
       aria-labelledby="hero-heading"
@@ -44,7 +53,12 @@ export function NilgiriHero({ firstName }: { firstName?: string }) {
         className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-brand-900/55 to-brand-900/90"
       />
 
-      <div className="relative flex min-h-[320px] flex-col justify-end p-6 sm:min-h-[420px] sm:p-10">
+      <div
+        className={cn(
+          "relative flex flex-col justify-end p-6 sm:p-10",
+          compact ? "min-h-[240px] sm:min-h-[300px]" : "min-h-[320px] sm:min-h-[420px]",
+        )}
+      >
         <p className="text-[0.7rem] font-semibold uppercase tracking-[0.22em] text-accent-300">
           Fresh from Ooty
         </p>

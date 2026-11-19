@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { Banner } from "@/types";
 import { cn } from "@/lib/cn";
+import { RemoteImage } from "@/components/ui/RemoteImage";
 
 // BannerCarousel renders active promo banners as an auto-rotating slideshow.
 // Each slide navigates to its link_url when clicked (internal route or external
@@ -12,17 +13,30 @@ export function BannerCarousel({ banners }: { banners: Banner[] }) {
   const [index, setIndex] = useState(0);
   const count = banners.length;
 
-  // Auto-advance every 5s (only when there's more than one slide).
+  // Hovering or focusing the carousel holds the current slide.
+  const [paused, setPaused] = useState(false);
+
+  // Auto-advance every 5s (only when there's more than one slide). Content that
+  // moves by itself has to be pausable, and should not start at all for
+  // someone who has asked their system for reduced motion - the dots still
+  // let them change slide by hand.
   useEffect(() => {
-    if (count <= 1) return;
+    if (count <= 1 || paused) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const t = setInterval(() => setIndex((i) => (i + 1) % count), 5000);
     return () => clearInterval(t);
-  }, [count]);
+  }, [count, paused]);
 
   if (count === 0) return null;
 
   return (
-    <div className="relative overflow-hidden rounded-3xl bg-brand-50">
+    <div
+      className="relative overflow-hidden rounded-3xl bg-brand-50"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocusCapture={() => setPaused(true)}
+      onBlurCapture={() => setPaused(false)}
+    >
       {/* Slides track */}
       <div
         className="flex transition-transform duration-500 ease-out"
@@ -54,18 +68,19 @@ export function BannerCarousel({ banners }: { banners: Banner[] }) {
 }
 
 function BannerSlide({ banner }: { banner: Banner }) {
-  const img = (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={banner.image_url}
-      alt={banner.title ?? "Promotion"}
-      className="h-40 w-full shrink-0 object-cover sm:h-64 md:h-80"
-    />
-  );
-
   const inner = (
-    <div className="relative w-full shrink-0 basis-full">
-      {img}
+    // The fixed heights live on this wrapper so the image can use `fill`: the
+    // slot is reserved before the image arrives and nothing shifts.
+    <div className="relative h-40 w-full shrink-0 basis-full sm:h-64 md:h-72">
+      {/* Through the shared image primitive rather than a bare <img>. A raw tag
+          downloaded every slide at full size on page load, including the ones
+          scrolled off to the side; this lazy-loads off-screen slides and serves
+          Cloudinary banners resized and as AVIF/WebP. */}
+      <RemoteImage
+        src={banner.image_url}
+        alt={banner.title ?? "Promotion"}
+        sizes="(min-width: 1152px) 1120px, 100vw"
+      />
       {banner.title && (
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/60 to-transparent p-4 sm:p-6">
           <p className="font-display text-lg font-bold text-white drop-shadow sm:text-2xl">{banner.title}</p>

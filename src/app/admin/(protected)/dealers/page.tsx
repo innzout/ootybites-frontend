@@ -14,34 +14,43 @@ import { PageHeader } from "@/components/admin/PageHeader";
 import { DataGrid } from "@/components/admin/DataGrid";
 import { GridActions } from "@/components/admin/GridActions";
 import { col, actionCol } from "@/components/admin/gridHelpers";
+import { LoadError } from "@/components/admin/LoadError";
+import { runAdminAction } from "@/lib/adminAction";
 
 export default function AdminDealersPage() {
   const router = useRouter();
   const [dealers, setDealers] = useState<Dealer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   function load() {
+    setLoadError(false);
     adminListDealers()
       .then((d) => setDealers(d.dealers ?? []))
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
   }
   useEffect(load, []);
 
   async function toggle(d: Dealer) {
-    await adminUpdateDealer(d.id, {
-      name: d.name,
-      mobile: d.mobile,
-      address: d.address ?? null,
-      username: d.username,
-      is_active: !d.is_active,
+    const ok = await runAdminAction(async () => {
+      await adminUpdateDealer(d.id, {
+        name: d.name,
+        mobile: d.mobile,
+        address: d.address ?? null,
+        username: d.username,
+        is_active: !d.is_active,
+      });
     });
-    load();
+    if (ok) load();
   }
 
   async function remove(id: string) {
     if (!(await askConfirm({ title: "Delete dealer?", message: "Their assigned orders will be unassigned.", tone: "danger", confirmText: "Delete" }))) return;
-    await adminDeleteDealer(id);
-    load();
+    const ok = await runAdminAction(async () => {
+      await adminDeleteDealer(id);
+    });
+    if (ok) load();
   }
 
   if (loading)
@@ -49,6 +58,16 @@ export default function AdminDealersPage() {
       <div className="flex justify-center py-20">
         <Spinner />
       </div>
+    );
+  if (loadError)
+    return (
+      <LoadError
+        what="dealers"
+        onRetry={() => {
+          setLoading(true);
+          load();
+        }}
+      />
     );
 
   const columnDefs = [
@@ -95,6 +114,7 @@ export default function AdminDealersPage() {
         rowData={dealers}
         columnDefs={columnDefs}
         getRowId={(d) => d.id}
+        searchable="Search dealers by name, mobile or username"
         sortable
         pagination
         pageSize={10}

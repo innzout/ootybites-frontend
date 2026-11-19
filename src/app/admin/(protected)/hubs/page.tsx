@@ -14,26 +14,35 @@ import { PageHeader } from "@/components/admin/PageHeader";
 import { DataGrid } from "@/components/admin/DataGrid";
 import { GridActions } from "@/components/admin/GridActions";
 import { col, actionCol } from "@/components/admin/gridHelpers";
+import { LoadError } from "@/components/admin/LoadError";
+import { runAdminAction } from "@/lib/adminAction";
 
 export default function AdminHubsPage() {
   const router = useRouter();
   const [hubs, setHubs] = useState<Hub[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   function load() {
-    adminListHubs().then((d) => setHubs(d.hubs ?? [])).finally(() => setLoading(false));
+    setLoadError(false);
+    adminListHubs().then((d) => setHubs(d.hubs ?? [])).catch(() => setLoadError(true))
+      .finally(() => setLoading(false));
   }
   useEffect(load, []);
 
   async function toggle(h: Hub) {
-    await adminUpdateHub(h.id, { name: h.name, dealer_id: h.dealer_id ?? null, is_active: !h.is_active });
-    load();
+    const ok = await runAdminAction(async () => {
+      await adminUpdateHub(h.id, { name: h.name, dealer_id: h.dealer_id ?? null, is_active: !h.is_active });
+    });
+    if (ok) load();
   }
 
   async function remove(id: string) {
     if (!(await askConfirm({ title: "Delete hub?", message: "Its areas become unassigned.", tone: "danger", confirmText: "Delete" }))) return;
-    await adminDeleteHub(id);
-    load();
+    const ok = await runAdminAction(async () => {
+      await adminDeleteHub(id);
+    });
+    if (ok) load();
   }
 
   if (loading)
@@ -41,6 +50,16 @@ export default function AdminHubsPage() {
       <div className="flex justify-center py-20">
         <Spinner />
       </div>
+    );
+  if (loadError)
+    return (
+      <LoadError
+        what="hubs"
+        onRetry={() => {
+          setLoading(true);
+          load();
+        }}
+      />
     );
 
   const columnDefs = [
@@ -96,6 +115,7 @@ export default function AdminHubsPage() {
         rowData={hubs}
         columnDefs={columnDefs}
         getRowId={(h) => h.id}
+        searchable="Search hubs or dealers"
         sortable
         pagination
         pageSize={10}

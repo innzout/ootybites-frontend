@@ -16,7 +16,7 @@
  * pages did not change beyond where the types are imported from.
  */
 import { useMemo, useState } from "react";
-import { ChevronDown, ChevronUp, ChevronsUpDown } from "lucide-react";
+import { ChevronDown, ChevronUp, ChevronsUpDown, Search, X } from "lucide-react";
 import { cellValue, type ColDef } from "@/components/admin/gridHelpers";
 import { cn } from "@/lib/cn";
 
@@ -38,6 +38,14 @@ export interface DataGridProps<T> {
   pagination?: boolean;
   /** Rows per page when `pagination` is on (default 10). */
   pageSize?: number;
+  /**
+   * Client-side search box above the table, for lists loaded in full. Matches
+   * the text of every column's value. Pass a string to set the placeholder.
+   * Not for server-paginated lists: there the caller searches on the server.
+   */
+  searchable?: boolean | string;
+  /** Extra text a row should match on that is not a column (e.g. a phone). */
+  searchText?: (row: T) => string;
 }
 
 type SortState = { colId: string; dir: "asc" | "desc" } | null;
@@ -64,8 +72,25 @@ export function DataGrid<T>({
   sortable,
   pagination,
   pageSize,
+  searchable,
+  searchText,
 }: DataGridProps<T>) {
   const size = pageSize ?? 10;
+  const [query, setQuery] = useState("");
+
+  // Search first, then sort, then paginate - so page 1 is page 1 of the matches.
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!searchable || !q) return rowData;
+    return rowData.filter((row) => {
+      const parts = columnDefs.map((c) => {
+        const v = cellValue(c, row);
+        return v == null || typeof v === "object" ? "" : String(v);
+      });
+      if (searchText) parts.push(searchText(row));
+      return parts.join(" ").toLowerCase().includes(q);
+    });
+  }, [rowData, columnDefs, query, searchable, searchText]);
   const [sort, setSort] = useState<SortState>(() => {
     // Only a column with a real key can be the sorted column; an empty-string
     // colId would silently match other keyless columns.
@@ -80,16 +105,16 @@ export function DataGrid<T>({
   // When the server sorts, rows arrive already ordered — sorting again locally
   // would fight the response. Only sort in-memory for purely client-side lists.
   const sorted = useMemo(() => {
-    if (onServerSort || !sort) return rowData;
+    if (onServerSort || !sort) return filtered;
     const c = columnDefs.find((d) => (d.colId ?? d.field) === sort.colId);
-    if (!c) return rowData;
-    const copy = [...rowData];
+    if (!c) return filtered;
+    const copy = [...filtered];
     copy.sort((x, y) => {
       const r = compare(cellValue(c, x), cellValue(c, y));
       return sort.dir === "asc" ? r : -r;
     });
     return copy;
-  }, [rowData, columnDefs, sort, onServerSort]);
+  }, [filtered, columnDefs, sort, onServerSort]);
 
   const pageCount = pagination ? Math.max(1, Math.ceil(sorted.length / size)) : 1;
   const current = Math.min(page, pageCount - 1);
@@ -107,6 +132,43 @@ export function DataGrid<T>({
 
   return (
     <div className="w-full">
+      {searchable && (
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          <label className="relative w-full max-w-xs">
+            <span className="sr-only">Search</span>
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden="true" />
+            <input
+              type="search"
+              value={query}
+              maxLength={100}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setPage(0);
+              }}
+              placeholder={typeof searchable === "string" ? searchable : "Search…"}
+              className="h-9 w-full rounded-full border border-line bg-white pl-9 pr-8 text-sm text-ink outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/25"
+            />
+            {query && (
+              <button
+                type="button"
+                aria-label="Clear search"
+                onClick={() => {
+                  setQuery("");
+                  setPage(0);
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted hover:text-ink"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </label>
+          {query.trim() && (
+            <span className="text-xs text-muted" aria-live="polite">
+              {filtered.length} of {rowData.length} match
+            </span>
+          )}
+        </div>
+      )}
       {/* Self-contained surface: the list pages used to wrap this in a <Card>,
           which drew a second identical border/radius around it. The shadow that
           Card provided lives here now. */}
@@ -200,7 +262,9 @@ export function DataGrid<T>({
 
         {!loading && rows.length === 0 && (
           <p className="px-4 py-14 text-center text-sm font-semibold text-muted">
-            {emptyText ?? "No records found."}
+            {query.trim() && rowData.length > 0
+              ? `Nothing matches “${query.trim()}”.`
+              : (emptyText ?? "No records found.")}
           </p>
         )}
 

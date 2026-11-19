@@ -15,16 +15,21 @@ import { PageHeader } from "@/components/admin/PageHeader";
 import { DataGrid } from "@/components/admin/DataGrid";
 import { GridActions } from "@/components/admin/GridActions";
 import { col, actionCol } from "@/components/admin/gridHelpers";
+import { LoadError } from "@/components/admin/LoadError";
+import { runAdminAction } from "@/lib/adminAction";
 
 export default function AdminAreasPage() {
   const router = useRouter();
   const [areas, setAreas] = useState<Area[]>([]);
   const [hubs, setHubs] = useState<Hub[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   function load() {
+    setLoadError(false);
     adminListAreas()
       .then((d) => setAreas(d.areas ?? []))
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
   }
   useEffect(() => {
@@ -34,22 +39,26 @@ export default function AdminAreasPage() {
 
   // Quick inline hub reassignment straight from the row.
   async function setHub(a: Area, hubId: string) {
-    await adminUpdateArea(a.id, {
-      code: a.code,
-      name: a.name,
-      city: a.city,
-      pincode: a.pincode,
-      hub_id: hubId || null,
-      is_active: a.is_active,
+    const ok = await runAdminAction(async () => {
+      await adminUpdateArea(a.id, {
+        code: a.code,
+        name: a.name,
+        city: a.city,
+        pincode: a.pincode,
+        hub_id: hubId || null,
+        is_active: a.is_active,
+      });
+      toast.success("Area updated");
     });
-    toast.success("Area updated");
-    load();
+    if (ok) load();
   }
 
   async function remove(id: string) {
     if (!(await askConfirm({ title: "Delete area?", tone: "danger", confirmText: "Delete" }))) return;
-    await adminDeleteArea(id);
-    load();
+    const ok = await runAdminAction(async () => {
+      await adminDeleteArea(id);
+    });
+    if (ok) load();
   }
 
   if (loading)
@@ -57,6 +66,16 @@ export default function AdminAreasPage() {
       <div className="flex justify-center py-20">
         <Spinner />
       </div>
+    );
+  if (loadError)
+    return (
+      <LoadError
+        what="areas"
+        onRetry={() => {
+          setLoading(true);
+          load();
+        }}
+      />
     );
 
   const columnDefs = [
@@ -107,6 +126,7 @@ export default function AdminAreasPage() {
         rowData={areas}
         columnDefs={columnDefs}
         getRowId={(a) => a.id}
+        searchable="Search areas, cities or pincodes"
         sortable
         pagination
         pageSize={10}

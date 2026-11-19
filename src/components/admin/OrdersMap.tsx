@@ -4,11 +4,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, ExternalLink, Navigation, Phone, X } from "lucide-react";
 import Link from "next/link";
 import { useMapsConfig } from "@/components/shop/MapsConfig";
-import { loadMaps, directionsUrl, latLngParam } from "@/lib/googleMaps";
+import { MarkerClusterer } from "@googlemaps/markerclusterer";
+import { loadMaps, directionsUrl, latLngParam, haversineKm } from "@/lib/googleMaps";
 import type { OrderMapPoint } from "@/lib/adminEndpoints";
 import { formatPrice, formatDate } from "@/lib/format";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Spinner } from "@/components/ui/Spinner";
+import { Badge } from "@/components/ui/Badge";
 
 // Pin colour by order status, so a glance at the map reads as workload: what is
 // waiting, what is out with a dealer, what is done.
@@ -54,6 +56,10 @@ export function OrdersMap({ points, loading }: { points: OrderMapPoint[]; loadin
   const divRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
+  // Groups nearby pins at low zoom. Without it, a few hundred orders in one
+  // town drew as a single unreadable heap; a cluster shows the count and
+  // zooms in on click.
+  const clustererRef = useRef<MarkerClusterer | null>(null);
   const rendererRef = useRef<any>(null);
 
   const [ready, setReady] = useState(false);
@@ -96,14 +102,14 @@ export function OrdersMap({ points, loading }: { points: OrderMapPoint[]; loadin
     if (!ready || !mapRef.current) return;
     const google = (window as any).google;
 
-    markersRef.current.forEach((m) => m.setMap(null));
+    clustererRef.current?.clearMarkers();
     markersRef.current = [];
 
     const bounds = new google.maps.LatLngBounds();
     points.forEach((p) => {
       const marker = new google.maps.Marker({
         position: { lat: p.ship_lat, lng: p.ship_lng },
-        map: mapRef.current,
+        // No map here: the clusterer decides when each pin is drawn.
         icon: pinIcon(google, p.status),
         title: `${p.order_number} · ${p.ship_name}`,
       });
@@ -116,6 +122,11 @@ export function OrdersMap({ points, loading }: { points: OrderMapPoint[]; loadin
       markersRef.current.push(marker);
       bounds.extend({ lat: p.ship_lat, lng: p.ship_lng });
     });
+    if (!clustererRef.current) {
+      clustererRef.current = new MarkerClusterer({ map: mapRef.current, markers: markersRef.current });
+    } else {
+      clustererRef.current.addMarkers(markersRef.current);
+    }
 
     // Fit to the pins so the admin lands on the area that has orders rather
     // than having to hunt for them. A single pin would otherwise zoom to the
@@ -225,9 +236,7 @@ export function OrdersMap({ points, loading }: { points: OrderMapPoint[]; loadin
             </Link>
             <StatusBadge status={selected.status} />
             {selected.is_express && (
-              <span className="rounded-full bg-accent-50 px-2 py-0.5 text-[11px] font-semibold text-accent-700">
-                24-hour
-              </span>
+              <Badge tone="accent">24-hour</Badge>
             )}
           </div>
 
@@ -240,6 +249,14 @@ export function OrdersMap({ points, loading }: { points: OrderMapPoint[]; loadin
             {selected.hub_name ? ` · from ${selected.hub_name}` : ""}
           </p>
 
+          {/* Straight-line distance needs no extra API, so it is there even
+              before the Directions API is enabled. */}
+          {!routeInfo && selected.hub_lat != null && selected.hub_lng != null && (
+            <p className="mt-2 text-xs text-muted">
+              About {haversineKm(selected.hub_lat, selected.hub_lng, selected.ship_lat, selected.ship_lng).toFixed(1)} km
+              from {selected.hub_name ?? "the hub"} in a straight line
+            </p>
+          )}
           {routeInfo && (
             <p className="mt-2 rounded-lg bg-brand-50 px-2 py-1 text-xs font-semibold text-brand-700">
               {routeInfo.distance} · about {routeInfo.duration} by road
