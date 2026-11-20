@@ -68,3 +68,46 @@ export function haversineKm(lat1: number, lng1: number, lat2: number, lng2: numb
   const a = Math.sin(dLat / 2) ** 2 + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLng / 2) ** 2;
   return 2 * 6371 * Math.asin(Math.min(1, Math.sqrt(a)));
 }
+
+export interface UserPosition {
+  lat: number;
+  lng: number;
+  /** Radius of uncertainty in metres. Above ~500 m it is usually an IP guess. */
+  accuracy: number;
+}
+
+// One lookup per page visit, shared by every map. Without this each map asked
+// separately, so a page with two maps could prompt twice and wait twice.
+let positionPromise: Promise<UserPosition | null> | null = null;
+
+/**
+ * The visitor's current position, used to open maps where they actually are
+ * instead of at a fixed default. Asks for permission the first time; the
+ * browser remembers the answer. Resolves to null when unavailable, denied or
+ * too slow, so callers always fall back to their own default and a map is
+ * never left waiting.
+ */
+export function getUserPosition(timeoutMs = 8000): Promise<UserPosition | null> {
+  if (typeof navigator === "undefined" || !navigator.geolocation) return Promise.resolve(null);
+  if (positionPromise) return positionPromise;
+  const pending = new Promise<UserPosition | null>((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy }),
+      () => {
+        // A refusal or failure is final for this visit; a timeout may succeed later.
+        resolve(null);
+      },
+      { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 5 * 60 * 1000 },
+    );
+  }).then((r) => {
+    if (!r) positionPromise = null;
+    return r;
+  });
+  positionPromise = pending;
+  return pending;
+}
+
+/** Zoom that matches how good a fix is, so a rough guess never looks exact. */
+export function zoomForAccuracy(accuracy: number): number {
+  return accuracy <= 50 ? 17 : accuracy <= 200 ? 16 : accuracy <= 1000 ? 14 : 12;
+}

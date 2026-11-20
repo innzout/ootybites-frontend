@@ -5,6 +5,7 @@ import { Zap, MapPin, ChevronDown, Check, Clock, LocateFixed } from "lucide-reac
 import type { Area, Product } from "@/types";
 import { listAddresses, listExpressAreas, listExpressProducts, nearestExpressAreas } from "@/lib/endpoints";
 import { useAuthStore } from "@/store/authStore";
+import { getUserPosition } from "@/lib/googleMaps";
 import { useHydrated } from "@/lib/useHydrated";
 import { Button } from "@/components/ui/Button";
 import { ProductCard } from "@/components/product/ProductCard";
@@ -72,8 +73,12 @@ export function ExpressClient({ initialAreas }: { initialAreas: Area[] | null })
           if (live && match) {
             setAreaId(match.id);
             setAreaSource("address");
+            return;
           }
         }
+        // No saved choice and no matching address: find them, rather than
+        // waiting for a tap. Quiet if they decline - they did not ask.
+        if (live && list.length > 0) locateMe(true);
       })
       .catch(() => live && setAreas([]))
       .finally(() => live && setLoadingAreas(false));
@@ -98,43 +103,41 @@ export function ExpressClient({ initialAreas }: { initialAreas: Area[] | null })
 
   // "Use my location": the browser's position, ranked against hub locations on
   // the server. Straight-line distance, so it says "nearest", not "exact".
-  function locateMe() {
+  // auto: called on arrival rather than by the button. A refusal or failure is
+  // then silent - the area picker is still there - instead of greeting the
+  // visitor with an error about something they did not ask for.
+  function locateMe(auto = false) {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
-      setLocateMsg("Your browser cannot share its location. Please choose your area instead.");
+      if (!auto) setLocateMsg("Your browser cannot share its location. Please choose your area instead.");
       return;
     }
     setLocating(true);
     setLocateMsg(null);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          const d = await nearestExpressAreas(pos.coords.latitude, pos.coords.longitude);
-          const nearest = d.areas?.[0];
-          if (!nearest) {
-            setLocateMsg("We could not match your location to a delivery area yet. Please choose one from the list.");
-          } else if (!nearest.in_range) {
-            setLocateMsg(
-              `24-hour delivery doesn't reach you yet — our nearest hub is about ${Math.round(nearest.distance_km)} km away. The full store still delivers to you.`,
-            );
-          } else {
-            chooseArea(nearest.id, "location", nearest.distance_km);
-          }
-        } catch {
-          setLocateMsg("Could not look up areas near you. Please choose your area instead.");
-        } finally {
-          setLocating(false);
-        }
-      },
-      (err) => {
+    // Shared with the other maps, so one visit asks for location only once.
+    getUserPosition().then(async (pos) => {
+      if (!pos) {
         setLocating(false);
-        setLocateMsg(
-          err.code === err.PERMISSION_DENIED
-            ? "Location permission was declined. Choose your area from the list instead."
-            : "Could not get your location just now. Choose your area from the list instead.",
-        );
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
-    );
+        if (!auto) setLocateMsg("Could not get your location. Choose your area from the list instead.");
+        return;
+      }
+      try {
+        const d = await nearestExpressAreas(pos.lat, pos.lng);
+        const nearest = d.areas?.[0];
+        if (!nearest) {
+          setLocateMsg("We could not match your location to a delivery area yet. Please choose one from the list.");
+        } else if (!nearest.in_range) {
+          setLocateMsg(
+            `24-hour delivery doesn't reach you yet — our nearest hub is about ${Math.round(nearest.distance_km)} km away. The full store still delivers to you.`,
+          );
+        } else {
+          chooseArea(nearest.id, "location", nearest.distance_km);
+        }
+      } catch {
+        setLocateMsg("Could not look up areas near you. Please choose your area instead.");
+      } finally {
+        setLocating(false);
+      }
+    });
   }
 
   const loadProducts = useCallback(() => {
@@ -245,7 +248,7 @@ export function ExpressClient({ initialAreas }: { initialAreas: Area[] | null })
           <div className="mt-2.5 flex min-h-[30px] flex-wrap items-center gap-x-3 gap-y-1.5">
             <button
               type="button"
-              onClick={locateMe}
+              onClick={() => locateMe()}
               disabled={locating || loadingAreas}
               className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/25 disabled:opacity-60"
             >

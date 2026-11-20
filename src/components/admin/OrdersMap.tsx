@@ -4,8 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, ExternalLink, Navigation, Phone, X } from "lucide-react";
 import Link from "next/link";
 import { useMapsConfig } from "@/components/shop/MapsConfig";
-import { MarkerClusterer } from "@googlemaps/markerclusterer";
-import { loadMaps, directionsUrl, latLngParam, haversineKm } from "@/lib/googleMaps";
+import { MarkerClusterer, SuperClusterAlgorithm, type Cluster } from "@googlemaps/markerclusterer";
+import { loadMaps, directionsUrl, latLngParam, haversineKm, getUserPosition, zoomForAccuracy } from "@/lib/googleMaps";
 import type { OrderMapPoint } from "@/lib/adminEndpoints";
 import { formatPrice, formatDate } from "@/lib/format";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -23,6 +23,43 @@ const PIN_COLOUR: Record<string, string> = {
 
 // Ooty, where Ootybites ships from — the fallback centre before any pin loads.
 const DEFAULT_CENTER = { lat: 11.4102, lng: 76.695 };
+
+// Most urgent first. A cluster takes the colour of the most urgent order in
+// it, so a bubble that hides a waiting order still shows red.
+const URGENCY = ["placed", "reached_dealer", "delivered", "cancelled"];
+
+function clusterStatus(cluster: Cluster): string {
+  const statuses = new Set(cluster.markers?.map((m: any) => m.get?.("status")) ?? []);
+  return URGENCY.find((s) => statuses.has(s)) ?? "cancelled";
+}
+
+/**
+ * Cluster bubble in the status colours, with the order count. The library's
+ * default was a plain blue bubble, so grouped orders lost their status colour:
+ * a pending order inside one looked the same as a delivered one.
+ */
+function clusterRenderer(google: any) {
+  return {
+    render: (cluster: Cluster) => {
+      const colour = PIN_COLOUR[clusterStatus(cluster)] ?? "#6b7280";
+      const n = cluster.count;
+      const size = n < 10 ? 34 : n < 50 ? 40 : 46;
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 40 40"><circle cx="20" cy="20" r="18" fill="${colour}" fill-opacity="0.92" stroke="#fff" stroke-width="3"/></svg>`;
+      return new google.maps.Marker({
+        position: cluster.position,
+        icon: {
+          url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg),
+          scaledSize: new google.maps.Size(size, size),
+          anchor: new google.maps.Point(size / 2, size / 2),
+        },
+        label: { text: String(n), color: "#ffffff", fontSize: "12px", fontWeight: "700" },
+        title: `${n} orders here — zoom in or click to see them`,
+        // Above single pins, so a cluster is never hidden behind one.
+        zIndex: 1000 + n,
+      });
+    },
+  };
+}
 
 /** An SVG teardrop pin, coloured per status. */
 function pinIcon(google: any, status: string) {
@@ -113,6 +150,7 @@ export function OrdersMap({ points, loading }: { points: OrderMapPoint[]; loadin
         icon: pinIcon(google, p.status),
         title: `${p.order_number} · ${p.ship_name}`,
       });
+      marker.set("status", p.status); // read by the cluster renderer
       marker.addListener("click", () => {
         setSelected(p);
         setRouteError(null);
@@ -123,7 +161,15 @@ export function OrdersMap({ points, loading }: { points: OrderMapPoint[]; loadin
       bounds.extend({ lat: p.ship_lat, lng: p.ship_lng });
     });
     if (!clustererRef.current) {
-      clustererRef.current = new MarkerClusterer({ map: mapRef.current, markers: markersRef.current });
+      clustererRef.current = new MarkerClusterer({
+        map: mapRef.current,
+        markers: markersRef.current,
+        // Group only pins that genuinely overlap, and stop grouping from street
+        // level (zoom 14) so individual coloured pins appear sooner. The default
+        // clustered almost everything in one town at the zoom that fits it.
+        algorithm: new SuperClusterAlgorithm({ radius: 45, maxZoom: 13 }),
+        renderer: clusterRenderer(google),
+      });
     } else {
       clustererRef.current.addMarkers(markersRef.current);
     }
@@ -136,6 +182,15 @@ export function OrdersMap({ points, loading }: { points: OrderMapPoint[]; loadin
       mapRef.current.setZoom(15);
     } else if (points.length > 1) {
       mapRef.current.fitBounds(bounds, 48);
+    } else {
+      // Nothing to plot: open where the admin is rather than leaving the view
+      // wherever the previous filter left it, which looked like a pin-less
+      // street that ought to have had an order on it.
+      getUserPosition().then((pos) => {
+        if (!pos || !mapRef.current) return;
+        mapRef.current.setCenter({ lat: pos.lat, lng: pos.lng });
+        mapRef.current.setZoom(Math.min(zoomForAccuracy(pos.accuracy), 13));
+      });
     }
   }, [points, ready]);
 

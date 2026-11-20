@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { MapPin, LocateFixed, AlertTriangle } from "lucide-react";
 import { useMapsConfig } from "@/components/shop/MapsConfig";
-import { loadMaps } from "@/lib/googleMaps";
+import { loadMaps, getUserPosition, zoomForAccuracy } from "@/lib/googleMaps";
 import { cn } from "@/lib/cn";
 
 // MapPicker is a Google-Maps location picker for the delivery address. It is
@@ -20,6 +20,10 @@ import { cn } from "@/lib/cn";
 
 // Default centre: Ooty, Nilgiris (where Ootybites ships from).
 const DEFAULT_CENTER = { lat: 11.4102, lng: 76.695 };
+
+// Anything coarser than this is not a street address — it is almost always an
+// IP lookup resolving to the ISP's exchange, which can be tens of km away.
+const COARSE_FIX_METRES = 500;
 
 // AdvancedMarkerElement only renders on a map that has a Map ID. DEMO_MAP_ID
 // works for development; create a real one in Cloud Console > Map Management
@@ -75,6 +79,9 @@ export function MapPicker({
   const [locating, setLocating] = useState(false);
   const [locateMsg, setLocateMsg] = useState<string | null>(null);
   const accuracyCircleRef = useRef<any>(null);
+  // Set once the customer places the pin themselves; the automatic first fix
+  // must never move a pin they have already put somewhere.
+  const userPlacedRef = useRef(false);
   const clearFixHintRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
@@ -126,6 +133,7 @@ export function MapPicker({
         // Once the customer places the pin themselves the uncertainty circle and
         // its warning are stale — they have just told us where they actually are.
         const clearFixHint = () => {
+          userPlacedRef.current = true;
           accuracyCircleRef.current?.setMap(null);
           accuracyCircleRef.current = null;
           setLocateMsg(null);
@@ -151,6 +159,21 @@ export function MapPicker({
           marker.addListener("dragend", onDragEnd);
         }
         clearFixHintRef.current = clearFixHint;
+
+        // Open where the customer is, not at a fixed default. A precise fix
+        // places the pin and fills the address like "Use my location"; a rough
+        // one (usually the internet provider's location, km away) only moves
+        // the view, so nothing wrong is written into the form.
+        if (!initial) {
+          getUserPosition().then((pos) => {
+            if (!pos || cancelled || userPlacedRef.current) return;
+            const here = new g.maps.LatLng(pos.lat, pos.lng);
+            map.setCenter(here);
+            map.setZoom(zoomForAccuracy(pos.accuracy));
+            setMarkerPos(marker, here);
+            if (pos.accuracy <= COARSE_FIX_METRES) reverse(here);
+          });
+        }
 
         // Places autocomplete: type an address → drop the pin + fill the fields.
         setupSearch(g, map, marker).then((ok) => !cancelled && setSearchReady(ok));
@@ -270,9 +293,6 @@ export function MapPicker({
     });
   }
 
-  // Anything coarser than this is not a street address — it is almost always an
-  // IP lookup resolving to the ISP's exchange, which can be tens of km away.
-  const COARSE_FIX_METRES = 500;
 
   function useMyLocation() {
     if (!navigator.geolocation || !mapRef.current) {
